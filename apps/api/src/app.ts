@@ -7,9 +7,14 @@ import type { Ctx } from "./context";
 import type { Db } from "./db";
 import { ApiError } from "./errors";
 import { createRateLimiter } from "./ratelimit";
+import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
+import { boardsRoutes } from "./routes/boards";
 import { healthRoutes } from "./routes/health";
 import { meRoutes } from "./routes/me";
+import { reportsRoutes } from "./routes/reports";
+import { savesRoutes } from "./routes/saves";
+import { scoresRoutes } from "./routes/scores";
 
 export interface AppDeps {
   db: Db;
@@ -74,6 +79,11 @@ export function createApp(deps: AppDeps): Hono {
   v1.route("/", healthRoutes());
   v1.route("/", authRoutes(ctx));
   v1.route("/", meRoutes(ctx));
+  v1.route("/", savesRoutes(ctx));
+  v1.route("/", scoresRoutes(ctx));
+  v1.route("/", boardsRoutes(ctx));
+  v1.route("/", reportsRoutes(ctx));
+  v1.route("/admin", adminRoutes(ctx));
   app.route("/v1", v1);
 
   app.notFound((c) => c.json({ error: "not_found", message: "Ruta no encontrada." }, 404));

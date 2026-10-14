@@ -40,5 +40,11 @@ export function meRoutes(ctx: Ctx): Hono<AppEnv> {
     return c.json(body);
   });
 
+  /** Borrado de cuenta (App Store 5.1.1(v)): el ON DELETE CASCADE elimina guardados, puntajes y reportes. */
+  r.delete("/me", ctx.requirePlayer, async (c) => {
+    await ctx.db.query("DELETE FROM players WHERE id = $1", [c.get("player").id]);
+    return c.json({ ok: true });
+  });
+
   return r;
 }
