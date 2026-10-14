@@ -34,3 +34,27 @@ export function fakeApi(over: Partial<{ [K in keyof ApiClient]: any }> = {}): { 
   api.auth = vi.fn(async (...a: unknown[]) => { const r = await origAuth(...a); creds = true; return r; });
   return api;
 }
+
+export function fakeNative() {
+  let bg: Array<(b: boolean) => void> = [];
+  let back: Array<() => void> = [];
+  return {
+    isNative: false,
+    haptic: vi.fn(),
+    lockOrientation: vi.fn(async () => undefined),
+    unlockOrientation: vi.fn(async () => undefined),
+    onBackground: vi.fn((fn: (b: boolean) => void) => {
+      bg.push(fn);
+      return () => void (bg = bg.filter((f) => f !== fn));
+    }),
+    onBackButton: vi.fn((fn: () => void) => {
+      back.push(fn);
+      return () => void (back = back.filter((f) => f !== fn));
+    }),
+    onNetwork: vi.fn(() => () => undefined),
+    insets: vi.fn(() => ({ top: 20, right: 0, bottom: 10, left: 0 })),
+    setStatusBar: vi.fn(async () => undefined),
+    emitBackground: (b: boolean) => bg.forEach((f) => f(b)),
+    emitBack: () => back.forEach((f) => f()),
+  };
+}
