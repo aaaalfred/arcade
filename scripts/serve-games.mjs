@@ -14,6 +14,10 @@ const MIME = {
   ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".wav": "audio/wav", ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf",
 };
 
+export function mimeFor(ext) {
+  return MIME[String(ext).toLowerCase()] ?? "application/octet-stream";
+}
+
 export function createGamesServer(root) {
   const base = resolve(root);
   return createServer((req, res) => {
@@ -36,7 +40,7 @@ export function createGamesServer(root) {
     if (file !== base && !file.startsWith(base + sep)) return send(403, "prohibido");
     if (existsSync(file) && statSync(file).isDirectory()) file = join(file, "index.html");
     if (!existsSync(file) || !statSync(file).isFile()) return send(404, "no encontrado");
-    send(200, readFileSync(file), MIME[extname(file).toLowerCase()] ?? "application/octet-stream");
+    send(200, readFileSync(file), mimeFor(extname(file)));
   });
 }
 
