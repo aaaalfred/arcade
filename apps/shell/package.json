@@ -10,7 +10,11 @@
     "typecheck": "tsc --noEmit",
     "test": "VITE_CONFIG_NATIVE_IGNORE_WARNING=true vitest run",
     "e2e": "playwright test",
-    "cap": "cap"
+    "cap": "cap",
+    "native:assets": "node scripts/make-assets.mjs && capacitor-assets generate --assetPath resources --iconBackgroundColor \"#14161d\" --iconBackgroundColorDark \"#14161d\" --splashBackgroundColor \"#e9ecf1\" --splashBackgroundColorDark \"#14161c\" --android --ios",
+    "native:sync": "VITE_CONFIG_NATIVE_IGNORE_WARNING=true vite build && cap sync && node scripts/patch-native.mjs",
+    "android:debug": "pnpm native:sync && cd android && ./gradlew assembleDebug",
+    "android:release": "pnpm native:sync && cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@arcade/protocol": "workspace:*",
@@ -38,6 +42,7 @@
     "@types/jsdom": "^30.0.0",
     "@types/node": "^22.0.0",
     "jsdom": "^30.0.0",
+    "sharp": "^0.35.5",
     "vite": "^8.0.0"
   }
 }
