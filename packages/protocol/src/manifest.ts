@@ -28,7 +28,13 @@ export const ManifestSchema = z
       .default("index.html")
       .refine((p) => !p.startsWith("/") && !p.split("/").includes(".."), "entry debe ser una ruta relativa dentro del juego"),
     orientation: z.enum(["portrait", "landscape", "any"]).default("portrait"),
-    theme: z.object({ accent: Hex, background: Hex, ink: Hex }),
+    theme: z.object({
+      accent: Hex,
+      background: Hex,
+      ink: Hex,
+      /** Paleta opcional cuando el sistema está en modo oscuro (si el juego lo soporta). */
+      dark: z.object({ accent: Hex, background: Hex, ink: Hex }).optional(),
+    }),
     icon: z.string().min(1).max(64),
     progress: z.object({ unit: z.string().min(1).max(20), total: z.number().int().positive() }),
     boards: z.array(BoardSchema).max(8).default([]),

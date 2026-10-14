@@ -7,7 +7,7 @@ import { Switch } from "../components/Switch";
 import { t } from "../i18n/es";
 import { isDark } from "../lib/color";
 import { takeLaunchRect } from "../lib/launch";
-import { gameVars } from "../lib/theme";
+import { gameVars, resolvePalette } from "../lib/theme";
 import { back, navigate } from "../router";
 import { useServices } from "../services";
 import { BoardView } from "./Ranking";
@@ -63,7 +63,8 @@ export function Play({ id }: { id: string }) {
     });
     handleRef.current = handle;
     void svc.native.lockOrientation(m.orientation);
-    void svc.native.setStatusBar(isDark(m.theme.background) ? "dark" : "light", m.theme.background);
+    const palette = resolvePalette(m);
+    void svc.native.setStatusBar(isDark(palette.background) ? "dark" : "light", palette.background);
     const offBack = svc.native.onBackButton(() => setMenu((open) => !open));
     const timer = setTimeout(() => setFailed(true), LOAD_TIMEOUT_MS);
     iframe.addEventListener("load", () => clearTimeout(timer), { once: true });

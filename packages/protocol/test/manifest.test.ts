@@ -23,6 +23,13 @@ describe("parseManifest", () => {
     expect(m.boards[0]).toMatchObject({ min: 0, max: 30, integer: true });
   });
 
+  it("acepta una paleta oscura opcional y la valida", () => {
+    const dark = { accent: "#5fcf85", background: "#14201c", ink: "#cfe3d8" };
+    expect(parseManifest({ ...base, theme: { ...base.theme, dark } }).theme.dark).toEqual(dark);
+    expect(() => parseManifest({ ...base, theme: { ...base.theme, dark: { ...dark, ink: "claro" } } })).toThrow();
+    expect(parseManifest(base).theme.dark).toBeUndefined();
+  });
+
   it("acepta colores #rgb", () => {
     expect(() => parseManifest({ ...base, theme: { accent: "#3a8", background: "#fff", ink: "#000" } })).not.toThrow();
   });

@@ -8,6 +8,7 @@ import { Ticks } from "../components/Ticks";
 import { toast } from "../components/Toast";
 import { hasString, t } from "../i18n/es";
 import { formatValue } from "../lib/format";
+import { resolvePalette } from "../lib/theme";
 import { navigate } from "../router";
 import { useServices } from "../services";
 import { ApiError } from "../services/api";
@@ -104,7 +105,7 @@ export function Profile() {
           const m = g.manifest;
           const s = gameStatus(m, store.progress.value[m.id]);
           return (
-            <div class="progress-row" key={m.id} style={{ "--g-accent": m.theme.accent }}>
+            <div class="progress-row" key={m.id} style={{ "--g-accent": resolvePalette(m).accent }}>
               <div class="progress-row__head">
                 <span class="progress-row__name"><GameIcon game={g} class="progress-row__icon" />{m.name}</span>
                 <span class="num muted">{s.done}/{s.total} {m.progress.unit}</span>
