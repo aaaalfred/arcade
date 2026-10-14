@@ -2,6 +2,8 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } fr
 import { extname, join, normalize, resolve, sep } from "node:path";
 import type { Plugin } from "vite";
 // @ts-expect-error — módulos .mjs sin tipos
+import { buildSdk } from "../../../scripts/build-sdk.mjs";
+// @ts-expect-error — módulos .mjs sin tipos
 import { checkGame } from "../../../scripts/check-games.mjs";
 // @ts-expect-error — módulos .mjs sin tipos
 import { mimeFor } from "../../../scripts/serve-games.mjs";
@@ -33,6 +35,10 @@ export function gamesPlugin(opts: { gamesDir: string }): Plugin {
       isBuild = config.command === "build";
       includeDev = !isBuild || config.env.VITE_INCLUDE_DEV_GAMES === "1";
       outDir = resolve(config.root, config.build.outDir);
+    },
+    /** El SDK siempre se reconstruye: nadie tiene que acordarse de `pnpm build:sdk`. */
+    async buildStart() {
+      await buildSdk();
     },
     configureServer(server) {
       server.middlewares.use("/games", (req, res, next) => {
