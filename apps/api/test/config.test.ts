@@ -21,7 +21,6 @@ describe("loadConfig", () => {
       {
         PORT: "9000",
         DATABASE_URL: "postgres://u:p@db:5432/arcade",
-        DB_MEMORY: "1",
         INCLUDE_DEV_GAMES: "1",
         TRUST_PROXY: "1",
         ADMIN_TOKEN: "x".repeat(24),
@@ -34,7 +33,7 @@ describe("loadConfig", () => {
     );
     expect(c.port).toBe(9000);
     expect(c.databaseUrl).toBe("postgres://u:p@db:5432/arcade");
-    expect(c.dbMemory).toBe(true);
+    expect(c.dbMemory).toBe(false);
     expect(c.includeDevGames).toBe(true);
     expect(c.trustProxy).toBe(true);
     expect(c.adminToken).toBe("x".repeat(24));
@@ -59,6 +58,11 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ INCLUDE_DEV_GAMES: "2" })).toThrow(/INCLUDE_DEV_GAMES/);
     expect(() => loadConfig({ ADMIN_TOKEN: "corto" })).toThrow(/ADMIN_TOKEN/);
     expect(() => loadConfig({ CORS_ORIGINS: "no-es-una-url" })).toThrow(/CORS_ORIGINS/);
+  });
+
+  it("rechaza DB_MEMORY=1 junto con DATABASE_URL (evita ensuciar o perder datos por error)", () => {
+    expect(() => loadConfig({ DB_MEMORY: "1", DATABASE_URL: "postgres://u:p@db/arcade" })).toThrow(/DB_MEMORY.*DATABASE_URL/);
+    expect(loadConfig({ DB_MEMORY: "0", DATABASE_URL: "postgres://u:p@db/arcade" }).databaseUrl).toBeDefined();
   });
 
   it("acepta 0/1/true/false en los interruptores", () => {

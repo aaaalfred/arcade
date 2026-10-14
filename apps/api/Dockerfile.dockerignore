@@ -1,0 +1,19 @@
+# Se aplica a `docker build -f apps/api/Dockerfile .` (BuildKit usa <Dockerfile>.dockerignore).
+.git
+**/node_modules
+**/dist
+**/.data
+**/.env
+**/.env.*
+!**/.env.example
+**/*.keystore
+**/*.jks
+**/playwright-report
+**/test-results
+**/coverage
+# proyectos nativos: pesados y sin uso en la API
+apps/shell/android
+apps/shell/ios
+# de los juegos solo hacen falta los manifiestos
+games/**
+!games/*/manifest.json

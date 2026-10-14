@@ -102,6 +102,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, opts: { cwd?: s
     throw new ConfigError(`Configuración inválida: ${detalle}`);
   }
   const v = parsed.data;
+  if (v.DB_MEMORY && v.DATABASE_URL) {
+    throw new ConfigError("Configuración inválida: DB_MEMORY=1 y DATABASE_URL a la vez; elige una sola base de datos.");
+  }
   return {
     port: v.PORT,
     databaseUrl: v.DATABASE_URL,
