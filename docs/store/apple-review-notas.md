@@ -9,7 +9,7 @@ QUÉ ES
 Una colección de juegos de ingenio y rompecabezas desarrollados por nosotros. Todos los juegos están
 EMBEBIDOS en el binario de la app (no se descarga código ni contenido ejecutable); funcionan sin conexión.
 Se ejecutan dentro de la propia app con WebKit y comparten un SDK propio para guardar partida,
-puntajes, vibración (Core Haptics) y anuncios nativos. No es un portal de software de terceros.
+puntajes, vibración (háptica del sistema) y anuncios nativos. No es un portal de software de terceros.
 
 FUNCIONES NATIVAS
 Vibración háptica, almacenamiento nativo persistente, bloqueo de orientación por juego, anuncios nativos
