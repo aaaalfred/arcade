@@ -336,3 +336,21 @@ Configuración: `webServer` levanta `apps/api` (PGlite en memoria, `INCLUDE_DEV_
 
 ## Ejecución
 Sin método impuesto por el usuario y con autorización previa para desarrollar: **ejecución nativa** en esta sesión. La API (Tasks 5–7) es independiente del shell una vez cerrado `protocol` (Task 2), así que se delega a un subagente en paralelo con un brief que incluye este plan y el spec; el resto lo hago yo. Revisión final por un revisor nuevo sobre toda la rama (Task 16).
+
+---
+
+## Desviaciones respecto al plan (registradas al implementar)
+
+| # | Plan | Realidad | Por qué |
+|---|------|----------|---------|
+| 1 | Pantalla «Detalle» de juego | **Eliminada**: tocar una pieza abre el juego; el progreso y el puesto se ven en la pieza, el ranking en su pestaña | Menos fricción y menos superficie (YAGNI) |
+| 2 | Outbox con claves `outbox:save:<juego>` | El guardado local lleva un indicador `dirty` + `seq` en `save:<juego>`; los puntajes llevan `pending` en `score:<juego>:<tablero>` | Misma coalescencia con menos estado; `seq` evita marcar como limpio un guardado hecho durante la subida |
+| 3 | `SyncEngine.pullGame(gameId, ms)` | `pull(ms)` trae **todos** los guardados en una llamada | `GET /saves` ya devuelve todos |
+| 4 | `BoardEntry { rank, nickname, value, isMe }` | Añade `playerId` | Necesario para «Reportar nombre» |
+| 5 | Tema por juego: una paleta | `theme.dark` **opcional** | Flechas tiene modo oscuro propio; sin ello la barra del shell desentona |
+| 6 | Playwright `webServer` | `globalSetup` propio (`e2e/global-setup.ts`) | En este WSL un puerto IPv4 cerrado no rechaza (se cuelga 20 s): la sonda de Playwright tardaba 135 s por servidor. Suite de ~4,6 min → **~15 s** |
+| 7 | API: `POST /auth/anonymous` ⇒ 200, `GET /saves` con resumen | 201; arreglo directo de guardados completos; errores `{error, message}` con códigos estables | Decisiones del subagente de la API, verificadas por los E2E |
+| 8 | `build` de la API con `tsup --noExternal` | `tsup.config.ts` con `noExternal` y copia de migraciones | El flag no existe en tsup 8.5 |
+| 9 | Íconos de juego solo emoji | Emoji **o** ruta de imagen (`icon.svg`) | Los emoji dependen de la fuente del dispositivo; Flechas usa SVG |
+| 10 | Parches nativos a mano | `apps/shell/scripts/patch-native.mjs` idempotente (AdMob, ATT, red de depuración, firma, versionado) | Reproducible tras `cap add`/`cap sync` y al cambiar el `appId` |
+| 11 | `xcodebuild`/CI de iOS verificados | **Solo escritos**; iOS no se pudo compilar (sin macOS) | Límite del entorno |
