@@ -3,7 +3,6 @@ import { GameIdSchema } from "@arcade/protocol";
 
 export type Route =
   | { name: "home" }
-  | { name: "game"; id: string }
   | { name: "play"; id: string }
   | { name: "ranking"; id?: string }
   | { name: "profile" };
@@ -20,7 +19,6 @@ export function parseHash(hash: string): Route {
   const [head, a, extra] = parts;
   if (extra !== undefined) return HOME;
   switch (head) {
-    case "game":
     case "play": {
       const id = gameId(a);
       return id ? { name: head, id } : HOME;
@@ -40,7 +38,6 @@ export function parseHash(hash: string): Route {
 export function toHash(r: Route): string {
   switch (r.name) {
     case "home": return "#/";
-    case "game": return `#/game/${r.id}`;
     case "play": return `#/play/${r.id}`;
     case "ranking": return r.id ? `#/ranking/${r.id}` : "#/ranking";
     case "profile": return "#/profile";

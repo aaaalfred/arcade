@@ -1,15 +1,23 @@
-import { getCatalog } from "./services/catalog";
-import { t } from "./i18n/es";
+import { SimulatedAdOverlay } from "./components/SimulatedAdOverlay";
+import { Tabs } from "./components/Tabs";
+import { Toasts } from "./components/Toast";
+import { route } from "./router";
+import { Home } from "./screens/Home";
+import { Play } from "./screens/Play";
+import { Profile } from "./screens/Profile";
+import { Ranking } from "./screens/Ranking";
 
 export function App() {
+  const r = route.value;
   return (
-    <main style={{ padding: "var(--s-5)" }}>
-      <h1>{t("app.name")}</h1>
-      <ul>
-        {getCatalog().map((g) => (
-          <li key={g.manifest.id}>{g.manifest.name}</li>
-        ))}
-      </ul>
-    </main>
+    <div class="shell">
+      {r.name === "home" && <Home />}
+      {r.name === "ranking" && <Ranking gameId={r.id} />}
+      {r.name === "profile" && <Profile />}
+      {r.name === "play" && <Play key={r.id} id={r.id} />}
+      {r.name !== "play" && <Tabs />}
+      <SimulatedAdOverlay />
+      <Toasts />
+    </div>
   );
 }

@@ -50,6 +50,7 @@ export function createApiClient(opts: { baseUrl: string; kv: KV; fetch?: typeof 
   }
 
   async function request<T>(method: string, path: string, body?: unknown, authed = true): Promise<T> {
+    if (!base) throw new ApiError(0, "network", "API no configurada (VITE_API_URL)");
     const headers: Record<string, string> = { Accept: "application/json" };
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (authed) {
