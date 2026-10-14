@@ -1,0 +1,69 @@
+name: iOS → TestFlight
+
+# SIN VERIFICAR: este flujo no se ha ejecutado (no hay Mac en el entorno de desarrollo).
+# Requiere cuenta Apple Developer, certificado de distribución, perfil de aprovisionamiento y llave de la API de App Store Connect.
+# Capacitor 8 exige Xcode 26+: ajusta "runs-on" y la versión de Xcode al runner macOS que lo ofrezca.
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "Versión visible (p. ej. 1.0.0)"
+        required: true
+        default: "1.0.0"
+
+jobs:
+  testflight:
+    runs-on: macos-26
+    env:
+      APP_ID: ${{ vars.APP_ID }}
+      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      VITE_PRIVACY_URL: ${{ vars.VITE_PRIVACY_URL }}
+      VITE_ADMOB_INTERSTITIAL_IOS: ${{ vars.VITE_ADMOB_INTERSTITIAL_IOS }}
+      VITE_ADMOB_REWARDED_IOS: ${{ vars.VITE_ADMOB_REWARDED_IOS }}
+      ADMOB_APP_ID_IOS: ${{ vars.ADMOB_APP_ID_IOS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @arcade/shell native:sync
+      - uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_CERT_P12_BASE64 }}
+          p12-password: ${{ secrets.IOS_CERT_PASSWORD }}
+      - name: Instalar perfil de aprovisionamiento
+        run: |
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "${{ secrets.IOS_PROFILE_BASE64 }}" | base64 -d > "$HOME/Library/MobileDevice/Provisioning Profiles/arcade.mobileprovision"
+      - name: Archivar
+        working-directory: apps/shell/ios/App
+        run: |
+          xcodebuild -resolvePackageDependencies -project App.xcodeproj -scheme App
+          xcodebuild archive -project App.xcodeproj -scheme App -configuration Release \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" MARKETING_VERSION="${{ inputs.version_name }}" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" CODE_SIGN_STYLE=Manual \
+            PROVISIONING_PROFILE_SPECIFIER="${{ secrets.IOS_PROFILE_NAME }}" CODE_SIGN_IDENTITY="Apple Distribution"
+      - name: Exportar IPA
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key><dict><key>${{ vars.APP_ID }}</key><string>${{ secrets.IOS_PROFILE_NAME }}</string></dict>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export"
+      - uses: apple-actions/upload-testflight-build@v3
+        with:
+          app-path: ${{ runner.temp }}/export/App.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}

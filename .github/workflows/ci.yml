@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Pruebas, validación de juegos y E2E
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4          # versión tomada de "packageManager" en package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm check:games --strict
+      - run: pnpm --filter @arcade/api build
+      - run: pnpm --filter @arcade/shell build
+      - run: pnpm --filter @arcade/shell exec playwright install --with-deps chromium
+      - run: pnpm --filter @arcade/shell e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-resultados
+          path: apps/shell/test-results
+
+  android-debug:
+    name: APK debug de Android
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @arcade/shell native:sync
+      - run: ./gradlew assembleDebug
+        working-directory: apps/shell/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: apps/shell/android/app/build/outputs/apk/debug/app-debug.apk

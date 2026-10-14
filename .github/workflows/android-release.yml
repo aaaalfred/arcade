@@ -1,0 +1,52 @@
+name: Android release (AAB firmado)
+
+# Manual o al crear una etiqueta v*. Requiere los secretos y variables indicados en docs/store/build-local.md.
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "Versión visible (p. ej. 1.0.0)"
+        required: true
+        default: "1.0.0"
+  push:
+    tags: ["v*"]
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    env:
+      APP_ID: ${{ vars.APP_ID }}
+      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      VITE_PRIVACY_URL: ${{ vars.VITE_PRIVACY_URL }}
+      VITE_ADMOB_INTERSTITIAL_ANDROID: ${{ vars.VITE_ADMOB_INTERSTITIAL_ANDROID }}
+      VITE_ADMOB_REWARDED_ANDROID: ${{ vars.VITE_ADMOB_REWARDED_ANDROID }}
+      ADMOB_APP_ID_ANDROID: ${{ vars.ADMOB_APP_ID_ANDROID }}
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: ${{ inputs.version_name || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @arcade/shell native:sync
+      - name: Restaurar keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "ARCADE_KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+      - run: ./gradlew bundleRelease
+        working-directory: apps/shell/android
+        env:
+          ARCADE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ARCADE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ARCADE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: apps/shell/android/app/build/outputs/bundle/release/app-release.aab
