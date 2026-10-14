@@ -40,7 +40,7 @@
 .btn[disabled] { opacity: 0.45; pointer-events: none; }
 .btn--ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
 .btn--danger { background: var(--danger); color: #fff; }
-.btn--text { background: none; color: var(--ink); min-height: 44px; padding: 0 var(--s-2); text-decoration: underline; text-underline-offset: 3px; }
+.btn--text { background: none; color: var(--ink); min-height: 44px; padding: 0 var(--s-2); margin-left: calc(var(--s-2) * -1); text-decoration: underline; text-underline-offset: 3px; }
 .btn--text.is-danger { color: var(--danger); }
 .btn--block { width: 100%; }
 .iconbtn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--r-chip); color: inherit; flex: none; }
