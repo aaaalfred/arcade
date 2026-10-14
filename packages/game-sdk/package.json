@@ -1,0 +1,10 @@
+{
+  "name": "@arcade/game-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run" },
+  "dependencies": { "@arcade/protocol": "workspace:*" },
+  "devDependencies": { "jsdom": "^30.0.0" }
+}

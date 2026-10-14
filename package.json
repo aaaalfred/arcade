@@ -1,0 +1,32 @@
+{
+  "name": "arcade",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.30.1",
+  "scripts": {
+    "build:sdk": "node scripts/build-sdk.mjs",
+    "check:games": "node scripts/check-games.mjs",
+    "dev:game": "node scripts/serve-games.mjs",
+    "dev:api": "pnpm --filter @arcade/api dev",
+    "dev:shell": "pnpm build:sdk && pnpm --filter @arcade/shell dev",
+    "test": "vitest run",
+    "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.0",
+    "vitest": "^5.0.0",
+    "zod": "^4.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  }
+}
