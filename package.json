@@ -9,7 +9,7 @@
   "packageManager": "pnpm@10.30.1",
   "scripts": {
     "build:sdk": "node scripts/build-sdk.mjs",
-    "check:games": "node scripts/check-games.mjs",
+    "check:games": "tsx scripts/check-games.mjs",
     "dev:game": "node scripts/serve-games.mjs",
     "dev:api": "pnpm --filter @arcade/api dev",
     "dev:shell": "pnpm build:sdk && pnpm --filter @arcade/shell dev",

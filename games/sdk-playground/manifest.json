@@ -1,0 +1,18 @@
+{
+  "id": "sdk-playground",
+  "name": "SDK Playground",
+  "tagline": "Prueba cada llamada del SDK (solo desarrollo)",
+  "version": "1.0.0",
+  "sdk": 1,
+  "entry": "index.html",
+  "orientation": "portrait",
+  "theme": { "accent": "#f5a524", "background": "#14110f", "ink": "#f4efe6" },
+  "icon": "🧪",
+  "progress": { "unit": "pasos", "total": 10 },
+  "boards": [
+    { "id": "taps", "name": "Toques", "sort": "desc", "min": 0, "max": 100000, "integer": true, "unit": "" },
+    { "id": "fastest", "name": "Tiempo más corto", "sort": "asc", "min": 1, "max": 600, "integer": true, "unit": "s" }
+  ],
+  "ads": { "interstitial": true, "rewarded": true },
+  "dev": true
+}

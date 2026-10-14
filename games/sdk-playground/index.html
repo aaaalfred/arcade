@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>SDK Playground</title>
+<style>
+  :root { --bg:#14110f; --panel:#221d18; --ink:#f4efe6; --muted:#a79c8c; --accent:#f5a524; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:15px/1.4 system-ui,sans-serif; }
+  main { max-width:520px; margin:0 auto; padding:14px 16px 24px; display:flex; flex-direction:column; gap:12px; }
+  h1 { font-size:18px; margin:0; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button, input { font:inherit; color:var(--ink); background:var(--panel); border:1px solid #3a322a; border-radius:10px; padding:10px 12px; }
+  button { cursor:pointer; min-height:44px; }
+  button.primary { background:var(--accent); color:#1a1205; border-color:var(--accent); font-weight:700; }
+  input { width:96px; }
+  #taps { font-size:44px; font-weight:800; color:var(--accent); }
+  pre { background:#0d0b09; border-radius:10px; padding:10px; margin:0; font-size:12px; max-height:180px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+  small { color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>SDK Playground <small id="mode">…</small></h1>
+  <div id="taps">0</div>
+  <div class="row">
+    <button id="btn-tap" class="primary">+1 toque</button>
+    <button id="btn-reset">Reiniciar</button>
+  </div>
+  <div class="row">
+    <button id="btn-score-taps">Enviar toques</button>
+    <input id="score-value" type="number" value="42" aria-label="Valor">
+    <button id="btn-score-custom">Enviar valor → taps</button>
+    <button id="btn-score-fastest">Enviar valor → fastest</button>
+  </div>
+  <div class="row">
+    <button id="btn-ad-int">Intersticial</button>
+    <button id="btn-ad-rew">Con recompensa</button>
+    <button id="btn-haptic">Háptica</button>
+    <button id="btn-lb">Ranking</button>
+    <button id="btn-exit">Salir</button>
+  </div>
+  <div><small>Sesión</small><pre id="session">…</pre></div>
+  <div><small>Registro</small><pre id="log"></pre></div>
+</main>
+
+<script src="../_sdk/arcade-sdk.js" data-game="sdk-playground"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var taps = 0;
+  var logEl = $("log");
+  function log(line) { logEl.textContent += line + "\n"; logEl.scrollTop = logEl.scrollHeight; }
+  function render() { $("taps").textContent = String(taps); }
+  function persist() {
+    Arcade.save({ taps: taps }, { progress: { value: Math.min(10, Math.floor(taps / 10)), total: 10 } });
+  }
+
+  Arcade.on("pause", function () { log("evento: pause"); });
+  Arcade.on("resume", function () { log("evento: resume"); });
+  Arcade.on("settings", function (s) { log("evento: settings " + JSON.stringify(s)); });
+
+  Arcade.ready().then(function (session) {
+    taps = (session.state && session.state.taps) || 0;
+    $("mode").textContent = "(" + session.mode + ")";
+    $("session").textContent = JSON.stringify(session, null, 1);
+    render();
+    log("ready: mode=" + session.mode + " taps=" + taps);
+  });
+
+  $("btn-tap").onclick = function () { taps++; render(); persist(); };
+  $("btn-reset").onclick = function () { taps = 0; render(); persist(); log("reiniciado"); };
+
+  function submit(board, value) {
+    log("score " + board + "=" + value + " …");
+    return Arcade.submitScore(board, value).then(function (r) { log("score ← " + JSON.stringify(r)); });
+  }
+  $("btn-score-taps").onclick = function () { submit("taps", taps); };
+  $("btn-score-custom").onclick = function () { submit("taps", Number($("score-value").value)); };
+  $("btn-score-fastest").onclick = function () { submit("fastest", Number($("score-value").value)); };
+
+  $("btn-ad-int").onclick = function () { log("intersticial …"); Arcade.ads.interstitial().then(function () { log("intersticial listo"); }); };
+  $("btn-ad-rew").onclick = function () { log("recompensa …"); Arcade.ads.rewarded().then(function (ok) { log("recompensa: " + ok); }); };
+  $("btn-haptic").onclick = function () { Arcade.haptic("success"); log("háptica"); };
+  $("btn-lb").onclick = function () { Arcade.openLeaderboard("taps"); };
+  $("btn-exit").onclick = function () { Arcade.exit(); };
+})();
+</script>
+</body>
+</html>
