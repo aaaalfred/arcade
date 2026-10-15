@@ -13,7 +13,7 @@ export function Ticks({ done, total }: { done: number; total: number }) {
   return (
     <div class="ticks" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={value}>
       {Array.from({ length: total }, (_, i) => (
-        <i key={i} class={i < value ? "on" : ""} />
+        <i key={i} class={i < value ? "on" : ""} style={{ "--k": i }} />
       ))}
     </div>
   );

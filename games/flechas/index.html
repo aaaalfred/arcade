@@ -45,8 +45,9 @@
   #stars { display:flex; gap:6px; font-size:28px; line-height:1; }
   #stars span { color:var(--star); transition:color .25s, transform .25s; }
   #stars span.off { color:var(--star-off); transform:scale(.85); }
-  #boardWrap { flex:1; display:flex; align-items:center; justify-content:center; min-height:0; }
-  canvas { touch-action:none; }
+  #boardWrap { flex:1; position:relative; min-height:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  #noGL { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--muted); }
   #msg { text-align:center; color:var(--muted); font-size:13px; min-height:18px; margin-bottom:4px; }
   .bottom { display:flex; justify-content:center; padding-top:6px; }
   #hintBtn { position:relative; width:58px; height:58px; padding:0; border-radius:16px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.08); }
@@ -77,7 +78,7 @@
       <div id="stars"><span>★</span><span>★</span><span>★</span></div>
       <div class="side">Nivel <b id="lvNum">1</b></div>
     </div>
-    <div id="boardWrap"><canvas id="cv"></canvas></div>
+    <div id="boardWrap"><canvas id="cv"></canvas><div id="noGL">No se pudo iniciar el modo 3D en este dispositivo.</div></div>
     <div id="msg"></div>
     <div class="bottom">
       <button id="hintBtn" aria-label="Pista">
@@ -102,6 +103,7 @@
 </div></div>
 
 <script src="../_sdk/arcade-sdk.js" data-game="flechas"></script>
+<script src="../_sdk/three.min.js"></script>
 <script src="logic.js"></script>
 <script src="levels.js"></script>
 <script>
@@ -123,12 +125,10 @@
   function save() { Arcade.save(progress, { progress: { value: levelsDone(), total: LEVELS.length } }); }
 
   const $ = (id) => document.getElementById(id);
-  const sMenu = $("sMenu"), sGame = $("sGame"), cv = $("cv"), ctx = cv.getContext("2d"), overlay = $("overlay");
+  const sMenu = $("sMenu"), sGame = $("sGame"), cv = $("cv"), overlay = $("overlay");
 
   /* ---------- Estado de la partida ---------- */
-  let cur = 0, lv = null, arrows = [], lives = LIVES, hints = HINTS, hintIdx = -1, over = false, mistakes = 0;
-  let cell = 40, margin = 20, cw = 0, ch = 0, dpr = 1, raf = 0;
-  const COLOR = () => getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#2e473f";
+  let cur = 0, lv = null, arrows = [], lives = LIVES, hints = HINTS, hintIdx = -1, over = false, mistakes = 0, raf = 0;
   const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
   function buildMenu() {
@@ -147,9 +147,12 @@
 
   function startLevel(i) {
     cur = i; lv = LEVELS[i]; lives = LIVES; hints = HINTS; hintIdx = -1; over = false; mistakes = 0;
-    arrows = lv.arrows.map((cells) => ({ cells, alive: true, anim: null, shake: 0, bad: 0 }));
     overlay.classList.remove("on"); $("msg").textContent = ""; $("lvNum").textContent = lv.id;
-    show("game"); updateHud(); resize();
+    show("game"); updateHud();
+    if (!initGL()) return;
+    buildScene();
+    resize();
+    kick();
   }
 
   function updateHud() {
@@ -158,34 +161,100 @@
     $("hintBtn").disabled = hints <= 0 || over;
   }
 
-  /* ---------- Geometría ---------- */
-  function resize() {
-    if (!lv) return;
-    const wrap = $("boardWrap");
-    const availW = Math.max(200, wrap.clientWidth), availH = Math.max(200, wrap.clientHeight);
-    cell = Math.floor(Math.min(availW / (lv.w + 1), availH / (lv.h + 1), 64));
-    margin = cell;
-    cw = lv.w * cell + margin * 2; ch = lv.h * cell + margin * 2;
-    dpr = window.devicePixelRatio || 1;
-    cv.width = cw * dpr; cv.height = ch * dpr; cv.style.width = cw + "px"; cv.style.height = ch + "px";
-    draw();
+  /* =====================================================================
+   * Presentación 3D (three.js, vendorizado en ../_sdk/three.min.js)
+   * Unidades del mundo: 1 celda = 1. x = columna, z = fila, y = altura.
+   * ===================================================================== */
+  const R_BODY = 0.17, R_HEAD = 0.36, H_HEAD = 0.52, Y_REST = 0.2, ELEV = 62;
+  let renderer = null, scene, camera, hemi, sun, boardGroup, arrowsGroup, plane;
+  let geoCyl, geoSph, geoCone, glOk = null, T = {};
+
+  function initGL() {
+    if (glOk !== null) return glOk;
+    try {
+      if (!window.THREE) throw new Error("three.js no cargó");
+      renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setClearColor(0x000000, 0);
+      renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(30, 1, 0.5, 300);
+      hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.85); scene.add(hemi);
+      sun = new THREE.DirectionalLight(0xffffff, 0.9);
+      sun.position.set(-4, 12, 6); sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0008;
+      scene.add(sun, sun.target);
+      boardGroup = new THREE.Group(); arrowsGroup = new THREE.Group(); scene.add(boardGroup, arrowsGroup);
+      geoCyl = new THREE.CylinderGeometry(1, 1, 1, 14);      // radio 1, alto 1 (se escala)
+      geoSph = new THREE.SphereGeometry(1, 16, 12);
+      geoCone = new THREE.ConeGeometry(R_HEAD, H_HEAD, 18);
+      plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -Y_REST);
+      cv.addEventListener("webglcontextlost", (e) => e.preventDefault());
+      cv.addEventListener("webglcontextrestored", () => draw());
+      glOk = true;
+    } catch (err) {
+      glOk = false; $("noGL").style.display = "flex"; cv.style.display = "none";
+      if (window.console) console.warn("[flechas] WebGL no disponible:", err);
+    }
+    return glOk;
   }
-  window.addEventListener("resize", () => { if (sGame.classList.contains("on")) resize(); });
 
-  const px = (r, c) => [margin + (c + 0.5) * cell, margin + (r + 0.5) * cell];
+  const wp = (r, c) => [c - (lv.w - 1) / 2, r - (lv.h - 1) / 2];   // celda -> [x, z]
 
-  // Polilínea de la serpiente + prolongación recta más allá del tablero (por donde sale).
-  function polyline(a) {
-    const pts = a.cells.map(([r, c]) => px(r, c));
-    const [dr, dc] = L.headDir(a.cells), h = pts[pts.length - 1];
-    const far = (cw + ch) * 2;
+  function readTheme() {
+    T = { ink: cssVar("--ink") || "#2e473f", green: cssVar("--green") || "#3f8a52", red: cssVar("--red") || "#d9534f",
+          panel: cssVar("--panel") || "#ffffff", line: cssVar("--line") || "#e6dfcf" };
+    T.dark = new THREE.Color(cssVar("--bg") || "#fff").getHSL({}).l < 0.5;
+  }
+
+  function disposeGroup(g) {
+    while (g.children.length) {
+      const o = g.children.pop();
+      if (o.userData.ownGeo && o.geometry) o.geometry.dispose();
+      if (o.material && o.userData.ownMat) o.material.dispose();
+    }
+  }
+
+  // Tablero (losa + borde + puntos en las celdas) y flechas del nivel actual
+  function buildScene() {
+    readTheme();
+    disposeGroup(boardGroup);
+    arrowsGroup.children.slice().forEach((g) => arrowsGroup.remove(g));
+    arrows.forEach((a) => a.mat && a.mat.dispose());
+
+    const bw = lv.w + 1.0, bh = lv.h + 1.0;
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.5, bh), new THREE.MeshStandardMaterial({ color: T.panel, roughness: 0.85 }));
+    slab.position.y = -0.25; slab.receiveShadow = true; slab.userData = { ownGeo: true, ownMat: true };
+    const lineCol = new THREE.Color(T.line).lerp(new THREE.Color(T.ink), 0.3);
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(bw + 0.3, 0.3, bh + 0.3), new THREE.MeshStandardMaterial({ color: T.line, roughness: 0.9 }));
+    rim.position.y = -0.62; rim.userData = { ownGeo: true, ownMat: true };
+    const dots = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 10), new THREE.MeshBasicMaterial({ color: lineCol }), lv.w * lv.h);
+    const m = new THREE.Matrix4();
+    for (let r = 0; r < lv.h; r++) for (let c = 0; c < lv.w; c++) { const p = wp(r, c); m.setPosition(p[0], 0.011, p[1]); dots.setMatrixAt(r * lv.w + c, m); }
+    dots.userData = { ownGeo: true, ownMat: true };
+    boardGroup.add(slab, rim, dots);
+
+    const half = Math.max(lv.w, lv.h) / 2 + 2;
+    const sc = sun.shadow.camera; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 1; sc.far = 40; sc.updateProjectionMatrix();
+    sun.position.set(-half * 0.5, 12, half * 0.8); sun.target.position.set(0, 0, 0);
+
+    arrows = lv.arrows.map((cells, i) => {
+      const a = { cells, alive: true, anim: null, shake: 0, bad: 0, intro: { t: -i * 0.04 }, group: new THREE.Group(),
+                  mat: new THREE.MeshStandardMaterial({ color: T.ink, roughness: 0.45, metalness: 0.05 }) };
+      a.geo = prep(a);
+      arrowsGroup.add(a.group); rebuild(a, 0, 1);
+      return a;
+    });
+  }
+
+  /* ---------- Geometría de cada flecha (polilínea en unidades de celda) ---------- */
+  // Serpiente + prolongación recta más allá del tablero (por donde sale).
+  function prep(a) {
+    const pts = a.cells.map(([r, c]) => wp(r, c));
+    const [dr, dc] = L.headDir(a.cells), h = pts[pts.length - 1], far = (lv.w + lv.h) * 2 + 10;
     pts.push([h[0] + dc * far, h[1] + dr * far]);
-    return pts;
-  }
-  function cumulative(pts) {
     const cum = [0];
     for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
-    return cum;
+    return { pts, cum, len: a.cells.length - 1, dEdge: L.rayCells(lv, a.cells).length + 0.5, dir: [dc, dr] };
   }
   function pointAt(pts, cum, d) {
     d = Math.max(0, Math.min(cum[cum.length - 1], d));
@@ -201,41 +270,78 @@
     return out;
   }
 
-  function drawArrow(a, color) {
-    const pts = a.geo ? a.geo.pts : (a.geo = prep(a)).pts, cum = a.geo.cum, len = a.geo.len;
-    const s = a.anim ? a.anim.s : 0;
-    let off = [0, 0];
-    if (a.shake > 0) { const [dr, dc] = L.headDir(a.cells); const k = Math.sin(a.shake * 40) * cell * 0.12 * a.shake; off = [dc * k, dr * k]; }
-    const sl = slice(pts, cum, s, s + len);
-    ctx.save(); ctx.translate(off[0], off[1]);
-    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = cell * 0.2; ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.beginPath(); sl.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
-    // punta
-    const e = sl[sl.length - 1], p0 = sl[sl.length - 2] || sl[0];
-    let dx = e[0] - p0[0], dy = e[1] - p0[1]; const m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
-    const t = cell * 0.34, w = cell * 0.26;
-    ctx.beginPath();
-    ctx.moveTo(e[0] + dx * t, e[1] + dy * t);
-    ctx.lineTo(e[0] - dy * w, e[1] + dx * w);
-    ctx.lineTo(e[0] + dy * w, e[1] - dx * w);
-    ctx.closePath(); ctx.fill();
-    ctx.restore();
-  }
-  function prep(a) {
-    const pts = polyline(a), cum = cumulative(pts);
-    // longitud del cuerpo = longitud de las celdas originales
-    let len = 0; for (let i = 1; i < a.cells.length; i++) len += cell;
-    return { pts, cum, len };
+  const UP = new THREE.Vector3(0, 1, 0), v1 = new THREE.Vector3();
+  function mesh(geo, a) { const m = new THREE.Mesh(geo, a.mat); m.castShadow = true; return m; }
+
+  // Reconstruye las mallas de la flecha para el desplazamiento s (cuerpo de tubos + esferas + cono en la punta)
+  function rebuild(a, s) {
+    const g = a.group;
+    while (g.children.length) g.remove(g.children[g.children.length - 1]);
+    const sl = slice(a.geo.pts, a.geo.cum, s, s + a.geo.len);
+    for (let i = 0; i < sl.length; i++) {
+      const p = sl[i], j = mesh(geoSph, a);
+      j.scale.setScalar(R_BODY); j.position.set(p[0], Y_REST, p[1]); g.add(j);
+      if (i === 0) continue;
+      const q = sl[i - 1], dx = p[0] - q[0], dz = p[1] - q[1], d = Math.hypot(dx, dz);
+      if (d < 1e-4) continue;
+      const seg = mesh(geoCyl, a);
+      seg.scale.set(R_BODY, d, R_BODY);
+      seg.position.set((p[0] + q[0]) / 2, Y_REST, (p[1] + q[1]) / 2);
+      seg.quaternion.setFromUnitVectors(UP, v1.set(dx / d, 0, dz / d));
+      g.add(seg);
+    }
+    const e = sl[sl.length - 1], pr = sl[sl.length - 2] || sl[0];
+    let dx = e[0] - pr[0], dz = e[1] - pr[1]; const mg = Math.hypot(dx, dz) || 1; dx /= mg; dz /= mg;
+    const cone = mesh(geoCone, a);
+    cone.position.set(e[0] + dx * 0.2, Y_REST, e[1] + dz * 0.2);
+    cone.quaternion.setFromUnitVectors(UP, v1.set(dx, 0, dz));
+    g.add(cone);
   }
 
+  /* ---------- Cámara: inclinada, encuadra el tablero completo en cualquier pantalla ---------- */
+  function resize() {
+    if (!lv || !glOk) return;
+    const wrap = $("boardWrap"), W = Math.max(200, wrap.clientWidth), H = Math.max(200, wrap.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    const el = ELEV * Math.PI / 180, hw = lv.w / 2 + 0.9, hh = lv.h / 2 + 0.9;
+    const corners = [[-hw, 0, -hh], [hw, 0, -hh], [-hw, 0, hh], [hw, 0, hh], [-hw, 0.6, -hh], [hw, 0.6, -hh]];
+    let lo = 2, hi = 250;
+    for (let k = 0; k < 28; k++) {
+      const D = (lo + hi) / 2;
+      camera.position.set(0, D * Math.sin(el), D * Math.cos(el)); camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      const fits = corners.every((c) => { v1.set(c[0], c[1], c[2]).project(camera); return Math.abs(v1.x) <= 0.97 && Math.abs(v1.y) <= 0.97; });
+      if (fits) hi = D; else lo = D;
+    }
+    camera.position.set(0, hi * Math.sin(el), hi * Math.cos(el)); camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+    draw();
+  }
+  window.addEventListener("resize", () => { if (sGame.classList.contains("on")) resize(); });
+
+  // Para pruebas E2E: posición en pantalla (px de página del iframe) del centro de una celda
+  window.__flechasCellToScreen = function (r, c) {
+    const rect = cv.getBoundingClientRect(), p = wp(r, c);
+    v1.set(p[0], Y_REST, p[1]).project(camera);
+    return [rect.left + (v1.x + 1) / 2 * rect.width, rect.top + (1 - v1.y) / 2 * rect.height];
+  };
+
   function draw() {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cw, ch);
-    const ink = cssVar("--ink") || "#2e473f", green = cssVar("--green") || "#3f8a52", red = cssVar("--red") || "#d9534f";
+    if (!glOk || !lv) return;
+    const k = T.dark ? 0.78 : 1;
+    const ink = new THREE.Color(T.ink).multiplyScalar(k), green = new THREE.Color(T.green), red = new THREE.Color(T.red);
     arrows.forEach((a, i) => {
-      if (!a.alive && !a.anim) return;
-      a.geo = prep(a);
-      drawArrow(a, a.bad > 0 ? red : (i === hintIdx ? green : ink));
+      a.group.visible = a.alive || !!a.anim;
+      if (!a.group.visible) return;
+      a.mat.color.copy(a.bad > 0 ? red : (i === hintIdx ? green : ink));
+      let ox = 0, oz = 0, oy = 0;
+      if (a.shake > 0) { const k = Math.sin(a.shake * 40) * 0.12 * a.shake; ox = a.geo.dir[0] * k; oz = a.geo.dir[1] * k; }
+      if (a.intro) { const p = Math.max(0, Math.min(1, a.intro.t / 0.5)); oy = Math.pow(1 - p, 3) * 3; }
+      a.group.position.set(ox, oy, oz);
     });
+    renderer.render(scene, camera);
   }
 
   /* ---------- Animación ---------- */
@@ -244,13 +350,18 @@
     const dt = Math.min(0.05, (now - (loop.t || now)) / 1000); loop.t = now;
     let busy = false;
     arrows.forEach((a) => {
+      if (a.intro) { a.intro.t += dt; if (a.intro.t >= 0.5) a.intro = null; else busy = true; }
       if (a.anim) {
-        a.anim.s += cell * 16 * dt * (0.4 + a.anim.s / (cell * 6));
-        const geo = a.geo || prep(a);
-        const [dr, dc] = L.headDir(a.cells), h = px(a.cells[a.cells.length - 1][0], a.cells[a.cells.length - 1][1]);
-        const dEdge = dr > 0 ? ch - h[1] : dr < 0 ? h[1] : dc > 0 ? cw - h[0] : h[0];
-        if (a.anim.s >= geo.len + dEdge + geo.len + 4) { a.anim = null; }
-        else busy = true;
+        a.anim.s += 16 * dt * (0.4 + a.anim.s / 6);
+        const g = a.geo, end = g.len + g.dEdge + 3;
+        if (a.anim.s >= end) { a.anim = null; }
+        else {
+          rebuild(a, a.anim.s);
+          // se desvanece al salir del tablero
+          const f = Math.max(0, Math.min(1, (a.anim.s - g.dEdge) / (g.len + 3)));
+          a.mat.transparent = f > 0; a.mat.opacity = 1 - f;
+          busy = true;
+        }
       }
       if (a.shake > 0) { a.shake = Math.max(0, a.shake - dt * 3); busy = true; }
       if (a.bad > 0) { a.bad = Math.max(0, a.bad - dt * 2.2); busy = true; }
@@ -261,22 +372,25 @@
   }
   function kick() { if (!raf) { loop.t = 0; raf = requestAnimationFrame(loop); } }
 
-  /* ---------- Entrada ---------- */
+  /* ---------- Entrada: se proyecta el toque sobre el plano del tablero y se busca la flecha más cercana ---------- */
   function distSeg(x, y, a, b) {
     const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1;
     const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2));
     return Math.hypot(x - (a[0] + dx * t), y - (a[1] + dy * t));
   }
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), hit = new THREE.Vector3();
   cv.addEventListener("pointerdown", (ev) => {
-    if (over || overlay.classList.contains("on")) return;
+    if (!glOk || !lv || over || overlay.classList.contains("on")) return;
     const rect = cv.getBoundingClientRect();
-    const x = (ev.clientX - rect.left) * (cw / rect.width), y = (ev.clientY - rect.top) * (ch / rect.height);
-    let best = -1, bd = cell * 0.5;
+    ndc.set(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    if (!ray.ray.intersectPlane(plane, hit)) return;
+    let best = -1, bd = 0.55;
     arrows.forEach((a, i) => {
       if (!a.alive) return;
-      const pts = a.cells.map(([r, c]) => px(r, c));
+      const pts = a.cells.map(([r, c]) => wp(r, c));
       // la zona tocable incluye la punta
-      for (let k = 1; k < pts.length; k++) { const d = distSeg(x, y, pts[k - 1], pts[k]); if (d < bd) { bd = d; best = i; } }
+      for (let k = 1; k < pts.length; k++) { const d = distSeg(hit.x, hit.z, pts[k - 1], pts[k]); if (d < bd) { bd = d; best = i; } }
     });
     if (best >= 0) tapArrow(best);
   });

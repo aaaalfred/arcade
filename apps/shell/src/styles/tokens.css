@@ -46,6 +46,12 @@
   --safe-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
   --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
   --safe-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+  /* Movimiento: una sola curva y tres duraciones para toda la app. */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 420ms;
   --tabbar-h: 64px;
   --topbar-h: 48px;
 }

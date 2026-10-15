@@ -1,6 +1,6 @@
 // Construye el SDK de juegos como IIFE minificado en games/_sdk/arcade-sdk.js
 import { build } from "esbuild";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,6 +26,8 @@ export async function buildSdk({ write = true } = {}) {
     const out = resolve(root, "games/_sdk/arcade-sdk.js");
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, code);
+    // Librerías de terceros para juegos 3D (vendorizadas: la app funciona sin red)
+    copyFileSync(resolve(root, "packages/game-sdk/vendor/three.min.js"), resolve(dirname(out), "three.min.js"));
   }
   return { code, bytes };
 }

@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Sudoku · 10 niveles</title>
+<style>
+  :root { --bg:#fdfaf2; --ink:#2e473f; --panel:#ffffff; --line:#e6dfcf; --muted:#7d877f; --text:#26332d;
+    --star:#f4a320; --star-off:#ddd6c4; --green:#3f8a52; --red:#d9534f; --sel:#cfe6d6; --hl:#eef4ea; --same:#f6dfa8; --thick:#2e473f; --errbg:#fbe0de; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec; --star-off:#3a4a43; --green:#5fcf85; --red:#ff7a72;
+    --sel:#35604a; --hl:#27382f; --same:#5a5028; --thick:#8fa299; --errbg:#5a2d2b; } }
+  :root[data-theme="dark"] { --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec; --star-off:#3a4a43; --green:#5fcf85; --red:#ff7a72;
+    --sel:#35604a; --hl:#27382f; --same:#5a5028; --thick:#8fa299; --errbg:#5a2d2b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:Arial,Helvetica,sans-serif; overscroll-behavior:none; touch-action:manipulation; }
+  #app { max-width:520px; margin:0 auto; height:100%; display:flex; flex-direction:column; padding:10px 16px 14px; }
+  .screen { display:none; flex:1; flex-direction:column; min-height:0; }
+  .screen.on { display:flex; }
+  #sMenu { overflow:auto; }
+  button { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; cursor:pointer; min-height:44px; }
+  button:active { transform:scale(.96); }
+  button.primary { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:bold; }
+  button:disabled { opacity:.4; }
+  h1 { font-size:22px; margin:14px 0 6px; text-align:center; color:var(--ink); }
+  h3 { margin:16px 0 8px; font-size:14px; color:var(--muted); font-weight:normal; text-align:center; }
+  .intro { text-align:center; color:var(--muted); margin:0 0 14px; line-height:1.4; font-size:14px; }
+  #grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  #grid button { padding:12px 0; font-size:18px; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  #grid button small { font-size:11px; color:var(--star); letter-spacing:1px; min-height:13px; }
+  #grid button em { font-style:normal; font-size:10px; color:var(--muted); min-height:12px; }
+  #rnd { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  #rnd button { padding:10px 0; font-size:12px; }
+  #cont { width:100%; margin-bottom:14px; }
+
+  .top { display:flex; align-items:center; justify-content:space-between; min-height:44px; }
+  .top .side { width:84px; font-size:13px; color:var(--muted); }
+  .top .side:last-child { text-align:right; }
+  #menuBtn { padding:6px 10px; font-size:16px; min-width:44px; }
+  #stars { display:flex; gap:6px; font-size:26px; line-height:1; color:var(--star); }
+  #stars span.off { color:var(--star-off); transform:scale(.85); }
+  #info { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin:2px 2px 2px; }
+  #boardWrap { flex:0 1 auto; width:100%; height:min(86vw,460px); margin:auto 0; position:relative; min-height:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  #noGL { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--muted); }
+  #tools { display:flex; justify-content:space-around; margin:6px 0 8px; }
+  .tool { position:relative; width:62px; padding:8px 0; border-radius:14px; display:flex; flex-direction:column; align-items:center; gap:2px; font-size:11px; color:var(--muted); }
+  .tool b { font-size:20px; line-height:1; color:var(--text); font-weight:normal; }
+  .tool.on { background:var(--ink); } .tool.on, .tool.on b { color:var(--bg); }
+  .badge { position:absolute; top:-7px; right:-5px; min-width:20px; height:20px; border-radius:10px; background:#5cb82a; color:#fff !important; font-size:12px; font-weight:bold; display:flex; align-items:center; justify-content:center; padding:0 4px; border:2px solid var(--bg); }
+  .badge.off { background:var(--muted); }
+  #pad { display:grid; grid-template-columns:repeat(9,1fr); gap:5px; }
+  #pad button { padding:6px 0 4px; font-size:26px; color:var(--ink); display:flex; flex-direction:column; align-items:center; line-height:1.1; }
+  #pad button small { font-size:10px; color:var(--muted); min-height:12px; }
+  #pad button.done { visibility:hidden; }
+  #msg { text-align:center; color:var(--muted); font-size:13px; min-height:18px; margin-top:6px; }
+
+  #overlay { position:fixed; inset:0; background:rgba(20,32,28,.55); display:none; align-items:center; justify-content:center; padding:24px; }
+  #overlay.on { display:flex; }
+  .card { background:var(--panel); border-radius:18px; padding:22px; width:100%; max-width:340px; text-align:center; border:1px solid var(--line); }
+  .card h2 { margin:0 0 6px; color:var(--ink); }
+  .big-stars { font-size:36px; color:var(--star); letter-spacing:4px; margin:8px 0; }
+  .card .row { display:flex; gap:8px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="sMenu" class="screen on">
+    <h1>Sudoku</h1>
+    <p class="intro">Rellena la cuadrícula: cada fila, columna y caja 3×3<br>debe contener los dígitos del 1 al 9. Tres errores y pierdes.</p>
+    <button id="cont" class="primary" style="display:none"></button>
+    <div id="grid"></div>
+    <h3>Nuevo aleatorio</h3>
+    <div id="rnd"></div>
+  </section>
+
+  <section id="sGame" class="screen">
+    <div class="top">
+      <div class="side"><button id="menuBtn" aria-label="Niveles">☰</button></div>
+      <div id="stars"><span>★</span><span>★</span><span>★</span></div>
+      <div class="side" id="title"></div>
+    </div>
+    <div id="info"><span id="errs">Errores: 0/3</span><span id="timer">00:00</span></div>
+    <div id="boardWrap"><canvas id="cv"></canvas><div id="noGL">No se pudo iniciar el modo 3D en este dispositivo.</div></div>
+    <div id="tools">
+      <button class="tool" id="bUndo"><b>↶</b>Deshacer</button>
+      <button class="tool" id="bErase"><b>⌫</b>Borrar</button>
+      <button class="tool" id="bNotes"><b>✎</b>Notas<span class="badge off" id="notesBadge">NO</span></button>
+      <button class="tool" id="bAuto"><b>▦</b>Autonotas</button>
+      <button class="tool" id="bHint"><b>💡</b>Pista<span class="badge" id="hintCount">3</span></button>
+    </div>
+    <div id="pad"></div>
+    <div id="msg"></div>
+  </section>
+</div>
+
+<div id="overlay"><div class="card">
+  <h2 id="ovTitle"></h2>
+  <div class="big-stars" id="ovStars"></div>
+  <div id="ovInfo" style="color:var(--muted)"></div>
+  <div class="row" id="ovRow"></div>
+</div></div>
+
+<script src="../_sdk/arcade-sdk.js" data-game="sudoku"></script>
+<script src="../_sdk/three.min.js"></script>
+<script src="logic.js"></script>
+<script src="puzzles.js"></script>
+<script>
+(function () {
+  "use strict";
+  const L = window.SudokuLogic, PUZ = window.PUZZLES;
+  const MAXERR = 3, HINTS = 3;
+
+  /* Anuncios: los gestiona la app (frecuencia, consentimiento, AdMob). El juego solo los pide. */
+  const Ads = {
+    interstitial: function () { return Arcade.ads.interstitial(); },
+    rewarded: function () { return Arcade.ads.rewarded(); }
+  };
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- Progreso guardado (lo persiste y sincroniza la app mediante el SDK) ---------- */
+  let progress = { stars: {}, best: {} };
+  let saved = null;      // partida en curso guardada (la que ofrece "Continuar")
+  let G = null;          // partida actual
+  let timerId = 0, sel = -1, notesMode = false, hintCell = -1, over = true, paused = false;
+  const fmt = (t) => String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
+  const levelsDone = () => Object.keys(progress.stars).filter((k) => progress.stars[k] > 0).length;
+
+  function slim(g) { // copia ligera de la partida (deshacer recortado) para no pasar de 64 KB
+    const o = Object.assign({}, g); o.undo = g.undo.slice(-30);
+    if (JSON.stringify(o).length > 60000) o.undo = [];
+    return o;
+  }
+  function persist() {
+    saved = (G && !over) ? G : null;
+    Arcade.save({ stars: progress.stars, best: progress.best, game: saved ? slim(saved) : null },
+      { progress: { value: levelsDone(), total: PUZ.length } });
+  }
+  const saveGame = persist;
+  function validGame(g) {
+    return !!g && typeof g === "object" && Array.isArray(g.vals) && g.vals.length === 81 && Array.isArray(g.notes) && g.notes.length === 81 &&
+      typeof g.puzzle === "string" && g.puzzle.length === 81 && typeof g.solution === "string" && g.solution.length === 81 &&
+      typeof g.key === "string" && typeof g.title === "string" && g.vals.every((v) => v >= 0 && v <= 9) && Array.isArray(g.undo) &&
+      typeof g.mistakes === "number" && g.mistakes < MAXERR && typeof g.time === "number";
+  }
+
+  /* ---------- Menú ---------- */
+  function buildMenu() {
+    const g = $("grid"); g.innerHTML = "";
+    PUZ.forEach((p, i) => {
+      const unlocked = i === 0 || progress.stars[i - 1] !== undefined;
+      const st = progress.stars[i] || 0, bt = progress.best[i];
+      const b = document.createElement("button");
+      b.innerHTML = (i + 1) + "<small>" + (st ? "★".repeat(st) + "☆".repeat(3 - st) : "") + "</small><em>" + (bt ? fmt(bt) : "") + "</em>";
+      if (!unlocked) { b.style.opacity = ".35"; b.disabled = true; }
+      b.onclick = () => startLevel(i);
+      g.appendChild(b);
+    });
+    const r = $("rnd"); r.innerHTML = "";
+    Object.keys(L.LEVELS).forEach((k) => {
+      const b = document.createElement("button"); b.textContent = L.LEVELS[k].name; b.onclick = () => startRandom(k); r.appendChild(b);
+    });
+    const sg = saved, c = $("cont");
+    c.style.display = sg ? "block" : "none";
+    if (sg) { c.textContent = "Continuar: " + sg.title + " · " + fmt(sg.time); c.onclick = () => resume(sg); }
+  }
+  function show(name) { $("sMenu").classList.toggle("on", name === "menu"); $("sGame").classList.toggle("on", name === "game"); }
+  function toMenu() { $("overlay").classList.remove("on"); stopTimer(); persist(); buildMenu(); show("menu"); }
+
+  /* ---------- Partida ---------- */
+  function newGame(key, title, puzzle, solution) {
+    const vals = L.parse(puzzle);
+    G = { key, title, puzzle, solution, vals, notes: new Array(81).fill(0), mistakes: 0, hints: HINTS, time: 0, hintsUsed: 0, undo: [], rewardUsed: false };
+    begin();
+  }
+  function startLevel(i) { const p = PUZ[i]; newGame("lv" + i, "Nivel " + (i + 1), p.puzzle, p.solution); }
+  function startRandom(k) {
+    $("msg").textContent = "";
+    const g = L.generate(L.LEVELS[k].clues);
+    newGame("rnd" + k, L.LEVELS[k].name + " (aleatorio)", g.puzzle, g.solution);
+  }
+  function resume(g) { G = g; begin(true); }
+  function begin(resumed) {
+    over = false; sel = -1; hintCell = -1; notesMode = false;
+    $("overlay").classList.remove("on"); $("msg").textContent = "";
+    $("title").textContent = G.title;
+    buildPad(); show("game");
+    initGL(); gfxNewGame();
+    render(); startTimer(); persist();
+    resize();
+  }
+  const isGiven = (i) => G.puzzle[i] !== "0";
+  const wrong = (i) => G.vals[i] && G.vals[i] !== +G.solution[i];
+
+  function buildPad() {
+    const p = $("pad"); p.innerHTML = "";
+    for (let n = 1; n <= 9; n++) { const x = document.createElement("button"); x.dataset.n = n; x.setAttribute("aria-label", "Número " + n); x.onclick = () => input(n); p.appendChild(x); }
+  }
+
+  function render() {
+    const counts = new Array(10).fill(0);
+    for (let i = 0; i < 81; i++) { const v = G.vals[i]; if (v && !wrong(i)) counts[v]++; }
+    [...$("pad").children].forEach((b) => { const n = +b.dataset.n; b.innerHTML = n + "<small>" + (9 - counts[n]) + "</small>"; b.classList.toggle("done", counts[n] >= 9); });
+    [...$("stars").children].forEach((s, k) => s.classList.toggle("off", k >= MAXERR - G.mistakes));
+    $("errs").textContent = "Errores: " + G.mistakes + "/" + MAXERR;
+    $("hintCount").textContent = G.hints > 0 ? G.hints : "▶";
+    $("bNotes").classList.toggle("on", notesMode);
+    $("notesBadge").textContent = notesMode ? "SÍ" : "NO"; $("notesBadge").classList.toggle("off", !notesMode);
+    $("bUndo").disabled = over || !G.undo.length;
+    gfxSync();
+  }
+
+  function snapshot() { G.undo.push({ vals: G.vals.slice(), notes: G.notes.slice(), mistakes: G.mistakes }); if (G.undo.length > 200) G.undo.shift(); }
+  function editable(i) { return i >= 0 && !isGiven(i) && !(G.vals[i] && !wrong(i)); }
+
+  function select(i) { sel = i; render(); }
+  function input(n) {
+    if (over || sel < 0) { if (!over) flash("Selecciona una casilla"); return; }
+    if (isGiven(sel) || (G.vals[sel] && !wrong(sel))) return;
+    if (notesMode) {
+      if (G.vals[sel]) return;
+      snapshot(); G.notes[sel] ^= (1 << n);
+    } else {
+      snapshot();
+      G.vals[sel] = n; G.notes[sel] = 0;
+      if (n === +G.solution[sel]) {
+        L.PEERS[sel].forEach((p) => { G.notes[p] &= ~(1 << n); });
+        Arcade.haptic("light");
+      } else {
+        G.mistakes++; gfxPulse(sel); Arcade.haptic("error");
+      }
+    }
+    hintCell = -1; afterChange();
+  }
+  function erase() {
+    if (over || !editable(sel)) return;
+    snapshot(); G.vals[sel] = 0; G.notes[sel] = 0; afterChange();
+  }
+  function undo() {
+    if (over || !G.undo.length) return;
+    const s = G.undo.pop(); G.vals = s.vals; G.notes = s.notes; G.mistakes = s.mistakes; hintCell = -1; render(); persist();
+  }
+  function autoNotes() {
+    if (over) return;
+    snapshot();
+    for (let i = 0; i < 81; i++) if (!G.vals[i]) G.notes[i] = L.candidates(G.vals.map((v, k) => (v && !wrong(k)) ? v : 0), i);
+    afterChange();
+  }
+  function hint() {
+    if (over) return;
+    const go = () => {
+      let i = (sel >= 0 && editable(sel) && true) ? sel : -1;
+      if (i < 0) { const c = []; for (let k = 0; k < 81; k++) if (!G.vals[k] || wrong(k)) c.push(k); i = c[(Math.random() * c.length) | 0]; }
+      if (i === undefined) return;
+      snapshot(); const n = +G.solution[i]; G.vals[i] = n; G.notes[i] = 0;
+      L.PEERS[i].forEach((p) => { G.notes[p] &= ~(1 << n); });
+      G.hints--; G.hintsUsed++; sel = i; hintCell = i; afterChange();
+    };
+    if (G.hints > 0) go(); else Ads.rewarded().then((ok) => { if (ok && !over) { G.hints = 1; go(); } });
+  }
+  function flash(t) { $("msg").textContent = t; setTimeout(() => { if ($("msg").textContent === t) $("msg").textContent = ""; }, 1800); }
+
+  function afterChange() {
+    render(); persist();
+    if (G.mistakes >= MAXERR) return lose();
+    if (G.vals.every((v, i) => v === +G.solution[i])) win();
+  }
+
+  /* ---------- Temporizador ---------- */
+  function startTimer() { stopTimer(); $("timer").textContent = fmt(G.time); timerId = setInterval(() => { if (!over && !paused && !document.hidden) { G.time++; $("timer").textContent = fmt(G.time); if (G.time % 5 === 0) persist(); } }, 1000); }
+  function stopTimer() { clearInterval(timerId); timerId = 0; }
+
+  /* ---------- Fin ---------- */
+  function overlay(title, stars, info, buttons) {
+    $("ovTitle").textContent = title; $("ovStars").textContent = stars; $("ovInfo").textContent = info;
+    const row = $("ovRow"); row.innerHTML = "";
+    buttons.forEach(([t, f, prim]) => { const b = document.createElement("button"); b.textContent = t; if (prim) b.className = "primary"; b.onclick = f; row.appendChild(b); });
+    $("overlay").classList.add("on");
+  }
+  function win() {
+    over = true; stopTimer();
+    const st = Math.max(1, 3 - G.mistakes);
+    const m = /^lv(\d+)$/.exec(G.key);
+    if (m) {
+      const i = +m[1];
+      progress.stars[i] = Math.max(progress.stars[i] || 0, st);
+      if (!progress.best[i] || G.time < progress.best[i]) progress.best[i] = G.time;
+    }
+    persist();
+    if (m) {
+      const total = Object.keys(progress.stars).reduce((n, k) => n + (progress.stars[k] || 0), 0);
+      Arcade.submitScore("stars", total);
+      if (PUZ.every((_, k) => progress.best[k] > 0)) { // tiempo total solo cuando los 10 niveles tienen marca
+        Arcade.submitScore("time", PUZ.reduce((n, _, k) => n + Math.max(1, Math.min(3599, progress.best[k])), 0));
+      }
+    }
+    Arcade.haptic("success");
+    gfxWave();
+    const k = G.key, time = G.time, used = G.hintsUsed;
+    const again = () => (m ? startLevel(+m[1]) : startRandom(k.slice(3)));
+    const btns = [["Menú", toMenu], ["Repetir", again]];
+    if (m && +m[1] + 1 < PUZ.length) btns.push(["Siguiente", () => startLevel(+m[1] + 1), true]); else if (!m) btns.push(["Otro", again, true]);
+    setTimeout(() => {
+      if (!over || G.key !== k) return;
+      overlay("¡Sudoku resuelto!", "★".repeat(st) + "☆".repeat(3 - st), "Tiempo " + fmt(time) + " · Pistas usadas " + used, btns);
+      Ads.interstitial();
+    }, 1100);
+  }
+  function lose() {
+    over = true; stopTimer(); persist();
+    const m = /^lv(\d+)$/.exec(G.key);
+    const btns = [["Menú", toMenu], ["Reintentar", () => m ? startLevel(+m[1]) : startRandom(G.key.slice(3))]];
+    if (!G.rewardUsed) btns.push(["Seguir (anuncio)", () => Ads.rewarded().then((ok) => {
+      if (!ok) return; G.rewardUsed = true; G.mistakes = MAXERR - 1; over = false; $("overlay").classList.remove("on"); render(); startTimer(); persist();
+    }), true]);
+    overlay("Derrota", "", "Cometiste 3 errores.", btns);
+  }
+
+  /* =====================================================================
+   * Presentación 3D del tablero (three.js, vendorizado en ../_sdk/three.min.js)
+   * Unidades: 1 casilla = 1. x = columna, z = fila, y = altura.
+   * La lógica del juego no sabe nada de esto: solo llama a gfx*().
+   * ===================================================================== */
+  const cv = $("cv");
+  const GAPB = 0.1, CS = 0.92, DEPTH = 0.8, ELEV = 68, TILE = 128, NCOLS = 10, NROWS = 5;
+  const axis = (k) => (k - 4) + (Math.floor(k / 3) - 1) * GAPB;
+  const CX = [], CZ = [];
+  for (let k = 0; k < 9; k++) { CX.push(axis(k)); CZ.push(axis(k)); }
+  const NQ = 81 + 81 * 9;
+
+  let renderer = null, scene, camera, hemi, sun, glOk = null, T = {};
+  let cells, slabMat, plateMat, rimMat, decals, decalMat, atlasCv, atlasTex, plane;
+  let qPos, qUv, qAlive;
+  const cur = new Float32Array(81), tgt = new Float32Array(81), eff = new Float32Array(81), pulse = new Float32Array(81);
+  let introT = 9, introT0 = 0, waveT = -1, waveT0 = 0, raf = 0, lastT = 0;
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const col = (n, d) => new THREE.Color(cssVar(n) || d);
+  const mat4 = new THREE.Matrix4(), v3 = new THREE.Vector3();
+
+  function readTheme() {
+    T = { panel: col("--panel", "#ffffff"), line: col("--line", "#e6dfcf"), thick: col("--thick", "#2e473f"), sel: col("--sel", "#cfe6d6"),
+          hl: col("--hl", "#eef4ea"), same: col("--same", "#f6dfa8"), errbg: col("--errbg", "#fbe0de"), green: col("--green", "#3f8a52"),
+          text: cssVar("--text") || "#26332d", greenS: cssVar("--green") || "#3f8a52", redS: cssVar("--red") || "#d9534f", muted: cssVar("--muted") || "#7d877f" };
+    T.hint = T.panel.clone().lerp(T.green, 0.5);
+    T.dark = col("--bg", "#fff").getHSL({}).l < 0.5;
+    if (hemi) { hemi.intensity = T.dark ? 0.85 : 0.5; sun.intensity = T.dark ? 0.85 : 0.5; }
+  }
+
+  // Atlas de números: una sola textura (5 filas de estilo x dígitos 0..9)
+  function buildAtlas() {
+    if (!atlasCv) atlasCv = document.createElement("canvas");
+    atlasCv.width = TILE * NCOLS; atlasCv.height = TILE * NROWS;
+    const x = atlasCv.getContext("2d");
+    x.clearRect(0, 0, atlasCv.width, atlasCv.height);
+    x.textAlign = "center"; x.textBaseline = "middle";
+    const rows = [
+      ["bold 100px Arial, Helvetica, sans-serif", T.text, true],      // dado
+      ["600 100px Arial, Helvetica, sans-serif", T.greenS, true],     // escrito por el jugador
+      ["bold 100px Arial, Helvetica, sans-serif", T.redS, true],      // error
+      ["bold 96px Arial, Helvetica, sans-serif", T.muted, false],     // nota
+      ["bold 104px Arial, Helvetica, sans-serif", T.greenS, false]    // nota resaltada
+    ];
+    rows.forEach((r, ri) => {
+      x.font = r[0]; x.fillStyle = r[1];
+      x.shadowColor = r[2] ? "rgba(0,0,0,.30)" : "rgba(0,0,0,0)"; x.shadowBlur = r[2] ? 5 : 0; x.shadowOffsetY = r[2] ? 5 : 0;
+      for (let n = 1; n <= 9; n++) x.fillText(String(n), n * TILE + TILE / 2, ri * TILE + TILE / 2 + 5);
+    });
+    if (!atlasTex) {
+      atlasTex = new THREE.CanvasTexture(atlasCv);
+      atlasTex.minFilter = THREE.LinearFilter; atlasTex.magFilter = THREE.LinearFilter; atlasTex.generateMipmaps = false;
+    }
+    atlasTex.needsUpdate = true;
+  }
+
+  function initGL() {
+    if (glOk !== null) return glOk;
+    try {
+      if (!window.THREE) throw new Error("three.js no cargó");
+      renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setClearColor(0x000000, 0);
+      renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(30, 1, 0.5, 300);
+      hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.8); scene.add(hemi);
+      sun = new THREE.DirectionalLight(0xffffff, 0.8);
+      sun.position.set(-4, 14, 7); sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0008;
+      const sc = sun.shadow.camera; sc.left = -7; sc.right = 7; sc.top = 7; sc.bottom = -7; sc.near = 1; sc.far = 40; sc.updateProjectionMatrix();
+      scene.add(sun, sun.target);
+      plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      readTheme();
+
+      // losa, borde y placas de las 9 cajas 3x3
+      slabMat = new THREE.MeshStandardMaterial({ color: T.thick, roughness: 0.8 });
+      plateMat = new THREE.MeshStandardMaterial({ color: T.line, roughness: 0.9 });
+      rimMat = new THREE.MeshStandardMaterial({ color: T.line, roughness: 0.9 });
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.5, 9.6), slabMat);
+      slab.position.y = -0.39; slab.receiveShadow = true;
+      const rim = new THREE.Mesh(new THREE.BoxGeometry(9.95, 0.3, 9.95), rimMat);
+      rim.position.y = -0.79;
+      scene.add(slab, rim);
+      const plateGeo = new THREE.BoxGeometry(3.06, 0.8, 3.06);
+      for (let br = 0; br < 3; br++) for (let bc = 0; bc < 3; bc++) {
+        const p = new THREE.Mesh(plateGeo, plateMat);
+        p.position.set(CX[bc * 3 + 1], -0.5, CZ[br * 3 + 1]); p.receiveShadow = true; scene.add(p);
+      }
+      // casillas con volumen (una sola InstancedMesh)
+      cells = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55 }), 81);
+      cells.frustumCulled = false; cells.castShadow = true; cells.receiveShadow = true;
+      for (let i = 0; i < 81; i++) cells.setColorAt(i, T.panel);
+      scene.add(cells);
+
+      // números y notas: un único mesh de cuadros texturizados con el atlas
+      qPos = new Float32Array(NQ * 12); qUv = new Float32Array(NQ * 8); qAlive = new Uint8Array(NQ);
+      const idx = new Uint16Array(NQ * 6);
+      for (let q = 0; q < NQ; q++) { const b = q * 4; idx.set([b, b + 1, b + 2, b, b + 2, b + 3], q * 6); }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(qPos, 3));
+      geo.setAttribute("uv", new THREE.BufferAttribute(qUv, 2));
+      geo.setIndex(new THREE.BufferAttribute(idx, 1));
+      buildAtlas();
+      decalMat = new THREE.MeshBasicMaterial({ map: atlasTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      decals = new THREE.Mesh(geo, decalMat); decals.frustumCulled = false; decals.renderOrder = 2;
+      scene.add(decals);
+
+      cv.addEventListener("webglcontextlost", (e) => e.preventDefault());
+      cv.addEventListener("webglcontextrestored", () => { buildAtlas(); draw(); });
+      glOk = true;
+    } catch (err) {
+      glOk = false; $("noGL").style.display = "flex"; cv.style.display = "none";
+      if (window.console) console.warn("[sudoku] WebGL no disponible:", err);
+    }
+    return glOk;
+  }
+
+  // Cambio de tema (claro/oscuro del sistema o de la app): se recolorea sin recrear nada
+  function applyTheme() {
+    if (!glOk) return;
+    readTheme();
+    slabMat.color.copy(T.thick); plateMat.color.copy(T.line); rimMat.color.copy(T.line);
+    buildAtlas();
+    if (G) gfxSync(); else draw();
+  }
+  try { new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] }); } catch (e) {}
+  try { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch (e) {}
+
+  function setQuad(q, row, n, cx, cz, half) {
+    if (n === 0) { qAlive[q] = 0; return; }
+    qAlive[q] = 1;
+    qPosC[q * 3] = cx; qPosC[q * 3 + 1] = cz; qPosC[q * 3 + 2] = half;
+    const u0 = n / NCOLS + 0.001, u1 = (n + 1) / NCOLS - 0.001, vT = 1 - row / NROWS - 0.002, vB = 1 - (row + 1) / NROWS + 0.002;
+    const o = q * 8;
+    qUv[o] = u0; qUv[o + 1] = vB; qUv[o + 2] = u1; qUv[o + 3] = vB; qUv[o + 4] = u1; qUv[o + 5] = vT; qUv[o + 6] = u0; qUv[o + 7] = vT;
+  }
+  const qPosC = new Float32Array(NQ * 3); // centro (x,z) y semilado de cada cuadro
+
+  // Sincroniza alturas objetivo, colores, números y notas con el estado de la partida
+  function gfxSync() {
+    if (!glOk || !G) return;
+    const sv = sel >= 0 ? G.vals[sel] : 0;
+    for (let i = 0; i < 81; i++) {
+      const v = G.vals[i], r = (i / 9) | 0, c = i % 9, bad = wrong(i);
+      let color = T.panel, h = 0;
+      if (sel >= 0) {
+        if (i === sel) { color = T.sel; h = 0.3; }
+        else if (sv && v === sv) { color = T.same; h = 0.1; }
+        else if (L.PEERS[sel].includes(i)) { color = T.hl; h = 0.035; }
+      }
+      if (i === hintCell && !bad) { color = T.hint; h = Math.max(h, 0.18); }
+      if (bad) { color = T.errbg; h = Math.max(h, 0.06); }
+      cells.setColorAt(i, color); tgt[i] = h;
+      // número / notas
+      if (v) setQuad(i, bad ? 2 : (isGiven(i) ? 0 : 1), v, CX[c], CZ[r], 0.46);
+      else qAlive[i] = 0;
+      for (let n = 1; n <= 9; n++) {
+        const q = 81 + i * 9 + n - 1;
+        if (!v && ((G.notes[i] >> n) & 1)) setQuad(q, sv === n ? 4 : 3, n, CX[c] + (((n - 1) % 3) - 1) * 0.29, CZ[r] + ((((n - 1) / 3) | 0) - 1) * 0.29, 0.15);
+        else qAlive[q] = 0;
+      }
+    }
+    cells.instanceColor.needsUpdate = true; decals.geometry.attributes.uv.needsUpdate = true;
+    kick();   // el dibujo ocurre en el siguiente cuadro (varios cambios seguidos se funden en un solo render)
+  }
+  function gfxNewGame() {
+    if (!glOk) return;
+    pulse.fill(0); waveT = -1; introT = 0; introT0 = performance.now(); cur.fill(0);
+    // la animación de entrada parte de las casillas hundidas
+  }
+  function gfxPulse(i) { if (glOk) { pulse[i] = 1; kick(); } }
+  function gfxWave() { if (glOk) { waveT = 0; waveT0 = performance.now(); kick(); } }
+
+  function resize() {
+    if (!glOk || !G) return;
+    const wrap = $("boardWrap"), W = Math.max(200, wrap.clientWidth), H = Math.max(200, wrap.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    const el = ELEV * Math.PI / 180, hw = 4.95, corners = [[-hw, 0, -hw], [hw, 0, -hw], [-hw, 0, hw], [hw, 0, hw], [-hw, 0.45, -hw], [hw, 0.45, -hw], [-hw, -0.9, hw], [hw, -0.9, hw]];
+    let lo = 2, hi = 250;
+    for (let k = 0; k < 28; k++) {
+      const D = (lo + hi) / 2;
+      camera.position.set(0, D * Math.sin(el), D * Math.cos(el)); camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      const fits = corners.every((c) => { v3.set(c[0], c[1], c[2]).project(camera); return Math.abs(v3.x) <= 0.97 && Math.abs(v3.y) <= 0.97; });
+      if (fits) hi = D; else lo = D;
+    }
+    camera.position.set(0, hi * Math.sin(el), hi * Math.cos(el)); camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+    draw();
+  }
+  window.addEventListener("resize", () => { if ($("sGame").classList.contains("on")) resize(); });
+  try { new ResizeObserver(() => { if ($("sGame").classList.contains("on")) resize(); }).observe($("boardWrap")); } catch (e) {}
+
+  // Alturas efectivas = objetivo suavizado + entrada + ola de victoria + rebote de error
+  function computeEff() {
+    for (let i = 0; i < 81; i++) {
+      const r = (i / 9) | 0, c = i % 9;
+      let o = cur[i];
+      if (introT < 1.3) { const p = Math.max(0, Math.min(1, (introT - (r + c) * 0.04) / 0.5)); o -= Math.pow(1 - p, 3) * 2.4; }
+      if (waveT >= 0) { const ph = waveT * 7 - (r + c) * 0.5; if (ph > 0 && ph < Math.PI) o += Math.sin(ph) * 0.35; }
+      if (pulse[i] > 0) o -= Math.sin((1 - pulse[i]) * Math.PI) * 0.12;
+      eff[i] = o;
+    }
+  }
+  function draw() {
+    if (!glOk || !G) return;
+    computeEff();
+    for (let i = 0; i < 81; i++) {
+      mat4.makeScale(CS, DEPTH, CS); mat4.setPosition(CX[i % 9], eff[i] - DEPTH / 2, CZ[(i / 9) | 0]);
+      cells.setMatrixAt(i, mat4);
+    }
+    cells.instanceMatrix.needsUpdate = true;
+    for (let q = 0; q < NQ; q++) {
+      const i = q < 81 ? q : ((q - 81) / 9) | 0, o = q * 12;
+      if (!qAlive[q]) { for (let k = 0; k < 12; k++) qPos[o + k] = 0; continue; }
+      const cx = qPosC[q * 3], cz = qPosC[q * 3 + 1], s = qPosC[q * 3 + 2], y = eff[i] + 0.006;
+      qPos[o] = cx - s; qPos[o + 1] = y; qPos[o + 2] = cz + s;
+      qPos[o + 3] = cx + s; qPos[o + 4] = y; qPos[o + 5] = cz + s;
+      qPos[o + 6] = cx + s; qPos[o + 7] = y; qPos[o + 8] = cz - s;
+      qPos[o + 9] = cx - s; qPos[o + 10] = y; qPos[o + 11] = cz - s;
+    }
+    decals.geometry.attributes.position.needsUpdate = true;
+    renderer.render(scene, camera);
+  }
+  function loop(now) {
+    raf = 0;
+    const dt = Math.min(0.05, (now - (lastT || now)) / 1000); lastT = now;
+    let busy = false;
+    for (let i = 0; i < 81; i++) {
+      const d = tgt[i] - cur[i];
+      if (Math.abs(d) > 0.003) { cur[i] += d * Math.min(1, dt * 16); busy = true; } else cur[i] = tgt[i];
+      if (pulse[i] > 0) { pulse[i] = Math.max(0, pulse[i] - dt * 2.8); busy = true; }
+    }
+    // entrada y ola van por reloj real (no por dt) para que no se alarguen en equipos lentos
+    if (introT < 1.3) { introT = (now - introT0) / 1000; busy = true; }
+    if (waveT >= 0) { waveT = (now - waveT0) / 1000; if (waveT > 1.8) waveT = -1; else busy = true; }
+    draw();
+    if (busy) raf = requestAnimationFrame(loop); else lastT = 0;
+  }
+  function kick() { if (glOk && !raf) { lastT = 0; raf = requestAnimationFrame(loop); } }
+
+  /* ---------- Entrada: el toque se proyecta sobre el plano del tablero y se toma la casilla más cercana ---------- */
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), hit = new THREE.Vector3();
+  const nearest = (p) => { let b = 0, bd = 1e9; for (let k = 0; k < 9; k++) { const d = Math.abs(p - CX[k]); if (d < bd) { bd = d; b = k; } } return b; };
+  cv.addEventListener("pointerdown", (ev) => {
+    if (!glOk || !G || over || $("overlay").classList.contains("on")) return;
+    const rect = cv.getBoundingClientRect();
+    ndc.set(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    if (!ray.ray.intersectPlane(plane, hit)) return;
+    if (Math.abs(hit.x) > 4.9 || Math.abs(hit.z) > 4.9) return;
+    select(nearest(hit.z) * 9 + nearest(hit.x));
+  });
+
+  /* ---------- Eventos ---------- */
+  $("menuBtn").onclick = toMenu;
+  $("bUndo").onclick = undo; $("bErase").onclick = erase; $("bHint").onclick = hint; $("bAuto").onclick = autoNotes;
+  $("bNotes").onclick = () => { notesMode = !notesMode; render(); };
+  document.addEventListener("keydown", (e) => {
+    if (!$("sGame").classList.contains("on") || over) return;
+    if (e.key >= "1" && e.key <= "9") input(+e.key);
+    else if (e.key === "Backspace" || e.key === "Delete" || e.key === "0") erase();
+    else if (e.key === "n" || e.key === "N") { notesMode = !notesMode; render(); }
+    else if (e.key === "h" || e.key === "H") hint();
+    else if ((e.key === "z" || e.key === "Z") ) undo();
+    else if (e.key.startsWith("Arrow")) {
+      e.preventDefault(); if (sel < 0) sel = 40; else {
+        let r = (sel / 9) | 0, c = sel % 9;
+        if (e.key === "ArrowUp") r = Math.max(0, r - 1); if (e.key === "ArrowDown") r = Math.min(8, r + 1);
+        if (e.key === "ArrowLeft") c = Math.max(0, c - 1); if (e.key === "ArrowRight") c = Math.min(8, c + 1);
+        sel = r * 9 + c;
+      } render();
+    }
+  });
+  document.addEventListener("visibilitychange", () => { if (document.hidden && G) persist(); });
+  window.addEventListener("pagehide", () => { if (G) persist(); });
+  Arcade.on("pause", () => { paused = true; if (G) persist(); });
+  Arcade.on("resume", () => { paused = false; });
+
+  // Ganchos para pruebas (posición en pantalla de una casilla, selección y entrada por código)
+  window.__sudoku = {
+    get G() { return G; }, get sel() { return sel; }, get glOk() { return glOk; },
+    select: (i) => { if (G && !over) select(i); },
+    input: (n) => input(n),
+    cellToScreen: (i) => { const rect = cv.getBoundingClientRect(); v3.set(CX[i % 9], eff[i] || 0, CZ[(i / 9) | 0]).project(camera); return [rect.left + (v3.x + 1) / 2 * rect.width, rect.top + (1 - v3.y) / 2 * rect.height]; }
+  };
+
+  Arcade.ready().then(function (session) {
+    const s = session.state;
+    if (s && typeof s === "object") {
+      if (s.stars && typeof s.stars === "object") progress.stars = s.stars;
+      if (s.best && typeof s.best === "object") progress.best = s.best;
+      if (validGame(s.game)) saved = s.game;
+    }
+    buildMenu();
+  });
+})();
+</script>
+</body>
+</html>

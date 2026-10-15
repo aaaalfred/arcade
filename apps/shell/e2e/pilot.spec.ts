@@ -10,21 +10,27 @@ async function gameContext(page: Page): Promise<Frame> {
   return frame;
 }
 
+/** Posición en la página de la celda (r,c): el juego es 3D, así que la proyecta él mismo (hook de pruebas). */
+async function cellPoint(page: Page, frame: Frame, r: number, c: number): Promise<[number, number]> {
+  const [x, y] = await frame.evaluate(([rr, cc]) => (window as any).__flechasCellToScreen(rr, cc), [r, c] as const);
+  const f = (await page.locator('[data-testid="game-frame"]').boundingBox())!;
+  return [f.x + x, f.y + y];
+}
+
 /** Resuelve el nivel tocando cada flecha libre, igual que haría una persona. */
 async function solveLevel(page: Page, frame: Frame, levelIndex: number) {
   const lv = await frame.evaluate((i) => (window as any).LEVELS_DATA[i], levelIndex);
   const alive: boolean[] = lv.arrows.map(() => true);
   const canvas = page.frameLocator('[data-testid="game-frame"]').locator("canvas");
   await expect(canvas).toBeVisible();
-  const box = (await canvas.boundingBox())!;
-  const cell = box.width / (lv.w + 2); // el lienzo mide (w+2)·celda: margen de una celda por lado
 
   for (let step = 0; step < lv.arrows.length; step++) {
     const free: number[] = await frame.evaluate(([l, a]) => (window as any).Logic.freeArrows(l, a), [lv, alive] as const);
     expect(free.length, "siempre debe haber una flecha libre").toBeGreaterThan(0);
     const idx = free[0]!;
     const [r, c] = lv.arrows[idx][lv.arrows[idx].length - 1]; // la cabeza
-    await page.mouse.click(box.x + cell + (c + 0.5) * cell, box.y + cell + (r + 0.5) * cell);
+    const [px, py] = await cellPoint(page, frame, r, c);
+    await page.mouse.click(px, py);
     alive[idx] = false;
   }
 }
@@ -72,11 +78,11 @@ test("Flechas: un error cuesta una estrella y se refleja en el puntaje", async (
   const lv = await frame.evaluate(() => (window as any).LEVELS_DATA[0]);
   const alive: boolean[] = lv.arrows.map(() => true);
   const canvas = page.frameLocator('[data-testid="game-frame"]').locator("canvas");
-  const box = (await canvas.boundingBox())!;
-  const cell = box.width / (lv.w + 2);
-  const tap = (idx: number) => {
+  await expect(canvas).toBeVisible();
+  const tap = async (idx: number) => {
     const [r, c] = lv.arrows[idx][lv.arrows[idx].length - 1];
-    return page.mouse.click(box.x + cell + (c + 0.5) * cell, box.y + cell + (r + 0.5) * cell);
+    const [px, py] = await cellPoint(page, frame, r, c);
+    await page.mouse.click(px, py);
   };
 
   // Tocar una flecha bloqueada primero (si existe) provoca un error

@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Bloques · Clásico y Niveles</title>
+<style>
+  :root {
+    --bg:#fdfaf2; --ink:#2e473f; --panel:#ffffff; --line:#e6dfcf; --muted:#7d877f; --text:#26332d;
+    --star:#f4a320; --star-off:#ddd6c4; --green:#3f8a52; --red:#d9534f; --cell:#efe9d9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec;
+      --star-off:#3a4a43; --green:#5fcf85; --red:#ff7a72; --cell:#243630;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec;
+    --star-off:#3a4a43; --green:#5fcf85; --red:#ff7a72; --cell:#243630;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:Arial,Helvetica,sans-serif; overscroll-behavior:none; touch-action:manipulation; }
+  #app { max-width:520px; margin:0 auto; height:100%; display:flex; flex-direction:column; padding:10px 16px 14px; }
+  .screen { display:none; flex:1; flex-direction:column; min-height:0; }
+  .screen.on { display:flex; }
+  button { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; min-height:44px; cursor:pointer; }
+  button:active { transform:scale(.96); }
+  button.primary { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:bold; }
+  button:disabled { opacity:.4; }
+  h1 { font-size:22px; margin:14px 0 6px; text-align:center; color:var(--ink); }
+  .intro { text-align:center; color:var(--muted); margin:0 0 14px; line-height:1.4; font-size:14px; }
+  #classic { width:100%; margin-bottom:16px; padding:14px; font-size:17px; }
+  #classic small { display:block; font-weight:normal; opacity:.8; font-size:12px; margin-top:2px; }
+  h3 { margin:4px 0 10px; color:var(--ink); font-size:15px; }
+  #grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  #grid button { padding:14px 0; font-size:18px; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  #grid button small { font-size:12px; color:var(--star); letter-spacing:1px; min-height:14px; }
+  #grid button.locked { opacity:.35; }
+  .top { display:flex; align-items:center; justify-content:space-between; min-height:44px; gap:8px; }
+  .top .side { width:64px; }
+  .top .side:last-child { text-align:right; color:var(--muted); font-size:13px; }
+  #menuBtn { padding:6px 10px; font-size:16px; min-width:44px; }
+  #hud { flex:1; text-align:center; line-height:1.15; }
+  #score { font-size:28px; font-weight:bold; color:var(--ink); }
+  #sub { font-size:13px; color:var(--muted); }
+  #goalBar { height:6px; background:var(--cell); border-radius:3px; margin:2px 0 4px; overflow:hidden; }
+  #goalFill { height:100%; width:0; background:var(--green); transition:width .3s; }
+  #boardWrap { flex:1; position:relative; min-height:0; overflow:hidden; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  #noGL { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--muted); }
+  #pops { position:absolute; inset:0; pointer-events:none; }
+  .pop { position:absolute; transform:translate(-50%,-50%); font-weight:bold; color:#fff; white-space:nowrap; text-shadow:0 0 4px var(--ink),0 0 4px var(--ink),0 2px 0 var(--ink); animation:popUp .9s ease-out forwards; }
+  @keyframes popUp { 0% { opacity:0; margin-top:10px; scale:.6; } 15% { opacity:1; scale:1.1; } 100% { opacity:0; margin-top:-46px; scale:1; } }
+  #msg { text-align:center; color:var(--muted); font-size:13px; min-height:18px; margin-bottom:4px; }
+  .bottom { display:flex; justify-content:center; gap:14px; padding-top:6px; }
+  .bottom button { position:relative; width:58px; height:58px; padding:0; border-radius:16px; font-size:24px; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+  .badge { position:absolute; top:-8px; right:-8px; min-width:22px; height:22px; border-radius:11px; background:#5cb82a; color:#fff; font-size:13px; font-weight:bold; display:flex; align-items:center; justify-content:center; padding:0 5px; border:2px solid var(--bg); }
+  #overlay { position:fixed; inset:0; background:rgba(20,32,28,.55); display:none; align-items:center; justify-content:center; padding:24px; }
+  #overlay.on { display:flex; }
+  .card { background:var(--panel); border-radius:18px; padding:22px; width:100%; max-width:340px; text-align:center; border:1px solid var(--line); }
+  .card h2 { margin:0 0 6px; color:var(--ink); }
+  .big-stars { font-size:36px; color:var(--star); letter-spacing:4px; margin:8px 0; }
+  .card .row { display:flex; gap:8px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="sMenu" class="screen on">
+    <h1>Bloques</h1>
+    <p class="intro">Arrastra las piezas al tablero de 8×8.<br>Completa filas o columnas para limpiarlas.</p>
+    <button id="classic" class="primary">Modo Clásico<small id="bestTxt">Mejor: 0</small></button>
+    <h3>Niveles</h3>
+    <div id="grid"></div>
+  </section>
+
+  <section id="sGame" class="screen">
+    <div class="top">
+      <div class="side"><button id="menuBtn" aria-label="Menú">☰</button></div>
+      <div id="hud"><div id="score">0</div><div id="goalBar"><div id="goalFill"></div></div><div id="sub"></div></div>
+      <div class="side" id="lvLabel"></div>
+    </div>
+    <div id="boardWrap"><canvas id="cv"></canvas><div id="pops"></div><div id="noGL">No se pudo iniciar el modo 3D en este dispositivo.</div></div>
+    <div id="msg"></div>
+    <div class="bottom">
+      <button id="undoBtn" aria-label="Deshacer">↶<span class="badge" id="undoCount">3</span></button>
+      <button id="hintBtn" aria-label="Pista"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#3f8a52" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z" fill="#3f8a52" fill-opacity=".85"/></svg></button>
+      <button id="restartBtn" aria-label="Reiniciar">⟳</button>
+    </div>
+  </section>
+</div>
+
+<div id="overlay"><div class="card">
+  <h2 id="ovTitle"></h2>
+  <div class="big-stars" id="ovStars"></div>
+  <div id="ovInfo" style="color:var(--muted)"></div>
+  <div class="row">
+    <button id="bMenu">Menú</button>
+    <button id="bRetry">Repetir</button>
+    <button id="bNext" class="primary">Siguiente</button>
+  </div>
+</div></div>
+
+<script src="../_sdk/arcade-sdk.js" data-game="block-blast"></script>
+<script src="../_sdk/three.min.js"></script>
+<script src="logic.js"></script>
+<script src="levels.js"></script>
+<script>
+(function () {
+  "use strict";
+  const L = window.Logic, LEVELS = window.LEVELS_DATA, N = 8;
+  const COLORS = ["", "#e8604c", "#f4a320", "#5cb82a", "#2fa7c9", "#6b6fd6", "#c05cb0"];
+
+  /* Anuncios: los gestiona la app (frecuencia, consentimiento, AdMob). El juego solo los pide. */
+  const Ads = {
+    interstitial: function () { return Arcade.ads.interstitial(); },
+    rewarded: function () { return Arcade.ads.rewarded(); }
+  };
+
+  /* ---------- Progreso guardado (lo persiste y sincroniza la app mediante el SDK) ---------- */
+  let progress = { stars: LEVELS.map(() => 0), best: 0 };
+  const levelsDone = () => progress.stars.filter(s => s > 0).length;
+  const totalStars = () => progress.stars.reduce((n, s) => n + (s || 0), 0);
+  function persist() { Arcade.save(progress, { progress: { value: levelsDone(), total: LEVELS.length } }); }
+  function restore(s) { // el estado puede venir de otro dispositivo: se valida su forma
+    if (!s || typeof s !== "object") return;
+    if (Array.isArray(s.stars)) progress.stars = LEVELS.map((_, i) => Math.max(0, Math.min(3, +s.stars[i] || 0)));
+    if (typeof s.best === "number" && isFinite(s.best) && s.best > 0) progress.best = Math.floor(s.best);
+  }
+  const $ = id => document.getElementById(id);
+  const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  /* ---------- Estado ---------- */
+  let G = null; // partida
+  function newGame(mode, lvIdx) {
+    const lv = mode === "level" ? LEVELS[lvIdx] : null;
+    const seed = lv ? lv.seed * 1000 + Math.floor(Math.random() * 1000) : Math.floor(Math.random() * 1e9);
+    G = { mode, lvIdx, lv, rng: L.mulberry(seed), board: lv ? lv.board.slice() : L.emptyBoard(),
+      tray: [], score: 0, lines: 0, gems: 0, streak: 0, miss: 0, trays: 0, undos: 3, undosUsed: 0, hintsUsed: 0,
+      snap: null, over: false, hint: null };
+    dealTray();
+  }
+  function difficulty() { return G.lv ? G.lv.diff : Math.min(1, G.score / 2500); }
+  function dealTray() {
+    const idx = L.generateTray(G.board, G.rng, difficulty());
+    G.tray = idx.map(i => ({ s: i, color: 1 + Math.floor(G.rng() * 6) }));
+    G.trays++; trayDirty = true;
+  }
+  function snapshot() { return JSON.stringify({ board: G.board, tray: G.tray, score: G.score, lines: G.lines, gems: G.gems, streak: G.streak, miss: G.miss, trays: G.trays }); }
+  function goalProgress() {
+    if (!G.lv) return 0;
+    const g = G.lv.goal; return Math.min(1, (g.type === "score" ? G.score : g.type === "lines" ? G.lines : G.gems) / g.n);
+  }
+
+  /* =====================================================================
+   * Presentación 3D (three.js, vendorizado en ../_sdk/three.min.js)
+   * Mundo: 1 celda = 1. x = columna, z = fila, y = altura. El tablero ocupa
+   * x,z en [-4,4]; la bandeja de piezas queda delante (z ≈ 5..8.4).
+   * ===================================================================== */
+  const cv = $("cv"), wrap = $("boardWrap");
+  const H_CUBE = 0.55, SLOT_Z = 6.7, SLOT_X = [-2.9, 0, 2.9], TRAY_Z0 = 4.7, ELEV = 58, LOOK_Z = 1.9;
+  let renderer = null, scene, camera, sun, glOk = null, T = {}, dark = false;
+  let geoCube, geoStud, geoGem, geoTile;
+  let slabMat, rimMat, tileMat, trayMat, stripMat, ghostMat;
+  let cubes, studs, gems, tiles, fx, strips = [], ghosts = [], slots = [], plane, raf = 0;
+  const dummy = new THREE.Object3D(), col = new THREE.Color(), v3 = new THREE.Vector3();
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), hit = new THREE.Vector3();
+  let drag = null, anims = [], hintUntil = 0, popAt = new Array(64).fill(-1e9), fxUntil = 0, trayDirty = true, busy = false;
+  const wx = c => c - (N - 1) / 2, wz = r => r - (N - 1) / 2;
+
+  function initGL() {
+    if (glOk !== null) return glOk;
+    try {
+      if (!window.THREE) throw new Error("three.js no cargó");
+      renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setClearColor(0x000000, 0);
+      renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(30, 1, 0.5, 300);
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.55));
+      sun = new THREE.DirectionalLight(0xffffff, 0.66);
+      sun.position.set(-5, 14, 8); sun.target.position.set(0, 0, LOOK_Z); sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0008;
+      const sc = sun.shadow.camera; sc.left = -9; sc.right = 9; sc.top = 10; sc.bottom = -10; sc.near = 1; sc.far = 45; sc.updateProjectionMatrix();
+      scene.add(sun, sun.target);
+      plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+      geoCube = new THREE.BoxGeometry(0.94, H_CUBE, 0.94);
+      geoStud = new THREE.CylinderGeometry(0.2, 0.22, 0.12, 14);
+      geoGem = new THREE.OctahedronGeometry(0.36);
+      geoTile = new THREE.BoxGeometry(0.9, 0.03, 0.9);
+      const std = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 });
+      slabMat = std(0xffffff); rimMat = std(0xe6dfcf); tileMat = std(0xefe9d9); trayMat = std(0xefe9d9);
+
+      // losa del tablero + marco, bandeja y casillas vacías (estático)
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(9, 0.5, 9), slabMat); slab.position.y = -0.25; slab.receiveShadow = true;
+      const rim = new THREE.Mesh(new THREE.BoxGeometry(9.3, 0.3, 9.3), rimMat); rim.position.y = -0.62;
+      const tray = new THREE.Mesh(new THREE.BoxGeometry(9, 0.36, 3.6), trayMat); tray.position.set(0, -0.18, SLOT_Z); tray.receiveShadow = true;
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(9.3, 0.3, 3.9), rimMat); trim.position.set(0, -0.51, SLOT_Z);
+      scene.add(slab, rim, tray, trim);
+      tiles = new THREE.InstancedMesh(geoTile, tileMat, 64); tiles.receiveShadow = true;
+      for (let i = 0; i < 64; i++) { dummy.position.set(wx(i % 8), 0.015, wz((i / 8) | 0)); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); tiles.setMatrixAt(i, dummy.matrix); }
+      scene.add(tiles);
+
+      // bloques del tablero (instanciados, color por instancia)
+      const mk = (geo, mat, shadow) => { const m = new THREE.InstancedMesh(geo, mat, 64); m.castShadow = shadow; m.receiveShadow = true; m.frustumCulled = false;
+        m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); for (let i = 0; i < 64; i++) m.setColorAt(i, col.set(0xffffff)); scene.add(m); return m; };
+      const wh = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+      cubes = mk(geoCube, wh, true); studs = mk(geoStud, wh, true);
+      gems = mk(geoGem, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1, emissive: 0xffffff, emissiveIntensity: 0.25 }), true);
+      fx = mk(geoCube, wh, false);
+
+      // franjas de aviso de línea (8 filas + 8 columnas)
+      stripMat = new THREE.MeshBasicMaterial({ color: 0xf4a320, transparent: true, opacity: 0.38, depthWrite: false });
+      const geoStrip = new THREE.PlaneGeometry(8, 0.96); geoStrip.rotateX(-Math.PI / 2);
+      for (let i = 0; i < 16; i++) { const m = new THREE.Mesh(geoStrip, stripMat); m.position.y = 0.66; m.visible = false;
+        if (i < 8) m.position.z = wz(i); else { m.rotation.y = Math.PI / 2; m.position.x = wx(i - 8); } scene.add(m); strips.push(m); }
+      // sombra/fantasma de destino (pool de 9 celdas)
+      ghostMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false });
+      for (let i = 0; i < 9; i++) { const m = new THREE.Mesh(geoCube, ghostMat); m.visible = false; scene.add(m); ghosts.push(m); }
+
+      // piezas de la bandeja (3 espacios, hasta 9 celdas cada uno; material propio por espacio)
+      for (let k = 0; k < 3; k++) {
+        const g = new THREE.Group(), cm = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }), cells = [];
+        for (let i = 0; i < 9; i++) {
+          const c = new THREE.Mesh(geoCube, cm), s = new THREE.Mesh(geoStud, cm);
+          c.castShadow = s.castShadow = true; c.receiveShadow = true; s.position.y = H_CUBE / 2 + 0.05; c.add(s); g.add(c); cells.push(c);
+        }
+        g.visible = false; scene.add(g);
+        slots.push({ g, cells, mat: cm, x: SLOT_X[k], y: 0, z: SLOT_Z, s: 0.01, tx: SLOT_X[k], ty: 0, tz: SLOT_Z, ts: 0.5, shape: null });
+      }
+      cv.addEventListener("webglcontextlost", e => e.preventDefault());
+      cv.addEventListener("webglcontextrestored", () => kick());
+      glOk = true;
+    } catch (err) {
+      glOk = false; $("noGL").style.display = "flex"; cv.style.display = "none";
+      if (window.console) console.warn("[block-blast] WebGL no disponible:", err);
+    }
+    return glOk;
+  }
+
+  function applyTheme() {
+    if (!glOk) return;
+    T = { ink: cssVar("--ink") || "#2e473f", panel: cssVar("--panel") || "#ffffff", line: cssVar("--line") || "#e6dfcf", cell: cssVar("--cell") || "#efe9d9", star: cssVar("--star") || "#f4a320" };
+    dark = col.set(cssVar("--bg") || "#fff").getHSL({}).l < 0.5;
+    slabMat.color.set(dark ? T.panel : T.cell).multiplyScalar(dark ? 1 : 0.93); rimMat.color.set(T.line); tileMat.color.set(T.cell).multiplyScalar(dark ? 1 : 0.82); trayMat.color.set(T.cell).multiplyScalar(dark ? 1 : 0.84);
+    stripMat.color.set(T.star);
+    kick();
+  }
+  const tone = hex => { col.set(hex); if (dark) col.multiplyScalar(0.88); return col; };
+
+  const tScale = s => Math.min(0.62, 2.5 / s.w, 2.9 / s.h);
+
+  // Sincroniza las piezas de la bandeja con G.tray (tras repartir, deshacer o iniciar)
+  function syncTray(popIn) {
+    trayDirty = false;
+    slots.forEach((sl, i) => {
+      const t = G && G.tray[i];
+      if (!t) { sl.shape = null; sl.g.visible = false; return; }
+      const s = L.SHAPES[t.s];
+      sl.shape = s; sl.g.visible = true; sl.mat.color.copy(tone(COLORS[t.color]));
+      sl.cells.forEach((c, k) => {
+        c.visible = k < s.cells.length;
+        if (c.visible) c.position.set(s.cells[k][0] + 0.5 - s.w / 2, H_CUBE / 2, s.cells[k][1] + 0.5 - s.h / 2);
+      });
+      sl.tx = SLOT_X[i]; sl.tz = SLOT_Z; sl.ty = 0; sl.ts = tScale(s);
+      if (popIn || sl.s < 0.05) { sl.x = sl.tx; sl.z = sl.tz; sl.y = 0; sl.s = 0.01; }
+    });
+  }
+
+  /* ---------- Cámara: inclinada, encuadra tablero + bandeja en cualquier pantalla ---------- */
+  function resize() {
+    if (!glOk || !G) return;
+    const W = Math.max(200, wrap.clientWidth), H = Math.max(200, wrap.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    const el = ELEV * Math.PI / 180, ex = 4.9, z0 = -4.9, z1 = 8.8;
+    const corners = [[-ex, 0, z0], [ex, 0, z0], [-ex, 0, z1], [ex, 0, z1], [-ex, 1.6, z0], [ex, 1.6, z0]];
+    let lo = 2, hi = 250;
+    for (let k = 0; k < 28; k++) {
+      const D = (lo + hi) / 2;
+      camera.position.set(0, D * Math.sin(el), LOOK_Z + D * Math.cos(el)); camera.lookAt(0, 0, LOOK_Z);
+      camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      const fits = corners.every(c => { v3.set(c[0], c[1], c[2]).project(camera); return Math.abs(v3.x) <= 0.97 && Math.abs(v3.y) <= 0.97; });
+      if (fits) hi = D; else lo = D;
+    }
+    camera.position.set(0, hi * Math.sin(el), LOOK_Z + hi * Math.cos(el)); camera.lookAt(0, 0, LOOK_Z);
+    camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+    kick();
+  }
+  window.addEventListener("resize", () => { if ($("sGame").classList.contains("on")) resize(); });
+  try { const mq = window.matchMedia("(prefers-color-scheme: dark)"); (mq.addEventListener ? mq.addEventListener("change", applyTheme) : mq.addListener(applyTheme)); } catch (e) {}
+  try { new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class", "style"] }); } catch (e) {}
+
+  function project(x, y, z) {
+    const r = cv.getBoundingClientRect(); v3.set(x, y, z).project(camera);
+    return [r.left + (v3.x + 1) / 2 * r.width, r.top + (1 - v3.y) / 2 * r.height];
+  }
+  // Para pruebas E2E: posición en pantalla (px de página) del centro de una celda y de un espacio de la bandeja
+  window.__bbCellToScreen = (r, c) => project(wx(c), 0.3, wz(r));
+  window.__bbTrayToScreen = i => project(SLOT_X[i], 0.3, SLOT_Z);
+
+  /* ---------- Geometría del arrastre ---------- */
+  function dragGeom() {
+    if (!drag) return null;
+    const s = L.SHAPES[G.tray[drag.slot].s], tx = drag.cx - s.w / 2, tz = drag.cz - s.h / 2;
+    return { s, gx: Math.round(tx + N / 2), gy: Math.round(tz + N / 2) };
+  }
+
+  /* ---------- Dibujo ---------- */
+  function setGhost(shape, gx, gy, colorHex, opacity) {
+    ghostMat.color.set(colorHex); ghostMat.opacity = opacity;
+    ghosts.forEach((m, i) => {
+      m.visible = !!shape && i < shape.cells.length;
+      if (m.visible) m.position.set(wx(gx + shape.cells[i][0]), H_CUBE / 2 + 0.01, wz(gy + shape.cells[i][1]));
+    });
+  }
+  function draw(now) {
+    if (!glOk || !G) return;
+    // tablero
+    const b = G.board;
+    for (let i = 0; i < 64; i++) {
+      const v = b[i];
+      if (!v) { dummy.scale.set(0, 0, 0); dummy.position.set(0, -5, 0); dummy.updateMatrix(); cubes.setMatrixAt(i, dummy.matrix); studs.setMatrixAt(i, dummy.matrix); gems.setMatrixAt(i, dummy.matrix); continue; }
+      const isGem = v >= 10, k = Math.max(0, 1 - (now - popAt[i]) / 240), sy = 1 + 0.35 * k * k + 0.1 * Math.sin(k * Math.PI);
+      const x = wx(i % 8), z = wz((i / 8) | 0);
+      dummy.rotation.set(0, 0, 0); dummy.scale.set(1, sy, 1); dummy.position.set(x, H_CUBE * sy / 2, z); dummy.updateMatrix(); cubes.setMatrixAt(i, dummy.matrix);
+      cubes.setColorAt(i, tone(COLORS[isGem ? v - 10 : v] || "#888888"));
+      if (isGem) {
+        studs.setColorAt(i, col); dummy.scale.set(0, 0, 0); dummy.updateMatrix(); studs.setMatrixAt(i, dummy.matrix);
+        dummy.scale.set(1, 1.25, 1); dummy.position.set(x, H_CUBE * sy + 0.26, z); dummy.rotation.y = Math.PI / 4; dummy.updateMatrix(); gems.setMatrixAt(i, dummy.matrix);
+      } else {
+        studs.setColorAt(i, col.multiplyScalar(1.12));
+        dummy.scale.set(1, 1, 1); dummy.position.set(x, H_CUBE * sy + 0.05, z); dummy.updateMatrix(); studs.setMatrixAt(i, dummy.matrix);
+        dummy.scale.set(0, 0, 0); dummy.updateMatrix(); gems.setMatrixAt(i, dummy.matrix);
+      }
+    }
+    cubes.instanceMatrix.needsUpdate = studs.instanceMatrix.needsUpdate = gems.instanceMatrix.needsUpdate = true;
+    cubes.instanceColor.needsUpdate = studs.instanceColor.needsUpdate = true;
+    // animación de limpieza (cubos que suben, giran y se encogen)
+    let n = 0;
+    anims.forEach(a => {
+      const k = Math.min(1, (now - a.t0) / 460); if (n >= 64) return;
+      const sc = Math.max(0.02, 1 + 0.22 * Math.sin(k * Math.PI) - 0.98 * k * k);
+      dummy.rotation.set(0, k * 1.6 * a.dir, 0); dummy.scale.set(sc, sc, sc);
+      dummy.position.set(wx(a.x), H_CUBE / 2 + 1.1 * k * (1 - 0.3 * k) * 1.2, wz(a.y)); dummy.updateMatrix();
+      fx.setMatrixAt(n, dummy.matrix); fx.setColorAt(n, tone(COLORS[a.v >= 10 ? a.v - 10 : a.v] || "#888888")); n++;
+    });
+    dummy.rotation.set(0, 0, 0); dummy.scale.set(0, 0, 0); dummy.position.set(0, -5, 0); dummy.updateMatrix();
+    for (; n < 64; n++) fx.setMatrixAt(n, dummy.matrix);
+    fx.instanceMatrix.needsUpdate = true; fx.instanceColor.needsUpdate = true;
+    // piezas de la bandeja / arrastre
+    slots.forEach(sl => {
+      sl.g.position.set(sl.x, sl.y, sl.z); sl.g.scale.setScalar(Math.max(0.01, sl.s));
+    });
+    // fantasma, avisos de línea y pista
+    strips.forEach(m => m.visible = false);
+    const dg = dragGeom();
+    if (dg && L.canPlace(G.board, dg.s, dg.gx, dg.gy)) {
+      const t = G.tray[drag.slot], nb = G.board.slice(), full = L.place(nb, dg.s, dg.gx, dg.gy, 1);
+      full.rows.forEach(r => strips[r].visible = true); full.cols.forEach(c => strips[8 + c].visible = true);
+      setGhost(dg.s, dg.gx, dg.gy, tone(COLORS[t.color]).getHex(), 0.5);
+    } else if (G.hint && now < hintUntil && !drag && G.tray[G.hint.slot]) {
+      const t = G.tray[G.hint.slot];
+      setGhost(L.SHAPES[t.s], G.hint.x, G.hint.y, tone(COLORS[t.color]).getHex(), 0.4 + 0.3 * Math.sin(now / 150));
+    } else setGhost(null);
+    renderer.render(scene, camera);
+  }
+
+  /* ---------- Bucle: solo corre mientras hay algo animándose ---------- */
+  let lastT = 0;
+  function loop(now) {
+    raf = 0;
+    const dt = Math.min(0.05, lastT ? (now - lastT) / 1000 : 0.016); lastT = now;
+    if (trayDirty) syncTray(true);
+    let moving = false;
+    const f = 1 - Math.exp(-dt * 16);
+    slots.forEach(sl => {
+      if (!sl.shape) return;
+      const dx = sl.tx - sl.x, dy = sl.ty - sl.y, dz = sl.tz - sl.z, ds = sl.ts - sl.s;
+      sl.x += dx * f; sl.y += dy * f; sl.z += dz * f; sl.s += ds * f;
+      if (Math.abs(dx) + Math.abs(dy) + Math.abs(dz) + Math.abs(ds) > 0.004) moving = true; else { sl.x = sl.tx; sl.y = sl.ty; sl.z = sl.tz; sl.s = sl.ts; }
+    });
+    anims = anims.filter(a => now - a.t0 < 460);
+    if (hintUntil && now >= hintUntil) { hintUntil = 0; if (G) G.hint = null; }
+    draw(now);
+    if (moving || drag || anims.length || now < hintUntil || now < fxUntil) raf = requestAnimationFrame(loop);
+    else lastT = 0;
+  }
+  function kick() { if (!raf && glOk) raf = requestAnimationFrame(loop); }
+
+  /* ---------- Textos flotantes (DOM sobre el canvas) ---------- */
+  function pop(text, x, y, size) {
+    const d = document.createElement("div"); d.className = "pop"; d.textContent = text;
+    d.style.left = x + "px"; d.style.top = y + "px"; d.style.fontSize = Math.round(22 * size) + "px";
+    $("pops").appendChild(d); setTimeout(() => d.remove(), 950);
+  }
+
+  /* ---------- HUD ---------- */
+  function hud() {
+    $("score").textContent = G.score;
+    if (G.lv) {
+      const g = G.lv.goal, cur = g.type === "score" ? G.score : g.type === "lines" ? G.lines : G.gems;
+      $("sub").textContent = G.lv.text + " · " + Math.min(cur, g.n) + "/" + g.n;
+      $("goalFill").style.width = (goalProgress() * 100) + "%"; $("goalBar").style.display = "block";
+      $("lvLabel").innerHTML = "Nivel <b>" + G.lv.id + "</b>";
+    } else {
+      $("sub").textContent = "Mejor: " + Math.max(progress.best, G.score) + (G.streak > 1 ? " · Racha x" + G.streak : "");
+      $("goalBar").style.display = "none"; $("lvLabel").textContent = "Clásico";
+    }
+    $("undoCount").textContent = G.undos;
+    $("undoBtn").disabled = !G.snap || G.over;
+  }
+
+  /* ---------- Entrada: el toque se proyecta sobre el plano del tablero ---------- */
+  function toWorld(e) {
+    const r = cv.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    return ray.ray.intersectPlane(plane, hit) ? hit : null;
+  }
+  function moveDrag(e) {
+    const h = toWorld(e); if (!h) return;
+    const sl = slots[drag.slot], s = sl.shape;
+    drag.cx = Math.max(-4.6, Math.min(4.6, h.x));
+    drag.cz = Math.max(-4.3 + s.h / 2 - 0.5, Math.min(8.2, h.z - drag.lift));
+    sl.tx = drag.cx; sl.tz = drag.cz; sl.ty = 1.0; sl.ts = 1;
+  }
+  cv.addEventListener("pointerdown", e => {
+    if (!glOk || !G || G.over || busy || drag) return;
+    const h = toWorld(e); if (!h || h.z < TRAY_Z0) return;
+    const slot = Math.max(0, Math.min(2, Math.floor((h.x + 4.5) / 3)));
+    if (!G.tray[slot] || !slots[slot].shape) return;
+    cv.setPointerCapture(e.pointerId);
+    G.hint = null; hintUntil = 0;
+    drag = { slot, cx: 0, cz: 0, lift: e.pointerType === "mouse" ? 1.3 : 2.5 };
+    moveDrag(e); kick();
+  });
+  cv.addEventListener("pointermove", e => { if (drag) { moveDrag(e); kick(); } });
+  function endDrag(cancel) {
+    if (!drag) return;
+    const dg = dragGeom(), slot = drag.slot, sl = slots[slot]; drag = null;
+    sl.tx = SLOT_X[slot]; sl.tz = SLOT_Z; sl.ty = 0; sl.ts = tScale(sl.shape);
+    if (!cancel && dg && L.canPlace(G.board, dg.s, dg.gx, dg.gy)) doPlace(slot, dg.gx, dg.gy);
+    else { if (!cancel) Arcade.haptic("light"); kick(); }
+  }
+  cv.addEventListener("pointerup", () => endDrag(false));
+  cv.addEventListener("pointercancel", () => endDrag(true));
+
+  function msg(t) { $("msg").textContent = t || ""; }
+  function doPlace(slot, x, y) {
+    const t = G.tray[slot], s = L.SHAPES[t.s], now = performance.now();
+    G.snap = snapshot();
+    const before = G.board.slice();
+    const res = L.place(G.board, s, x, y, t.color);
+    G.tray[slot] = null; slots[slot].shape = null; slots[slot].g.visible = false;
+    if (res.lines) { G.streak++; G.miss = 0; } else { G.miss++; if (G.miss >= 3) G.streak = 0; }
+    const pts = L.scoreMove(s.n, res.lines, G.streak, res.boardEmpty);
+    G.score += pts; G.lines += res.lines; G.gems += res.gems;
+    s.cells.forEach(c => popAt[(y + c[1]) * N + x + c[0]] = now);
+    const tmp = before.slice(); s.cells.forEach(c => tmp[(y + c[1]) * N + x + c[0]] = t.color);
+    res.cleared.forEach(i => anims.push({ x: i % 8, y: (i / 8) | 0, v: tmp[i], t0: now, dir: i % 2 ? 1 : -1 }));
+    fxUntil = now + 300;
+    const rc = wrap.getBoundingClientRect();
+    if (res.lines) {
+      Arcade.haptic(res.lines > 1 ? "success" : "medium");
+      const c = project(0, 0.5, 0), cx = c[0] - rc.left, cy = c[1] - rc.top;
+      pop("+" + pts, cx, cy, 1 + Math.min(res.lines, 4) * 0.25);
+      if (G.streak > 1) pop("Racha x" + G.streak + "!", cx, cy + 34, 0.8);
+      if (res.boardEmpty) pop("¡Tablero limpio!", cx, cy - 34, 0.9);
+      msg(res.lines > 1 ? "¡" + res.lines + " líneas a la vez!" : "");
+    } else Arcade.haptic("light");
+    if (!G.tray.some(p => p)) dealTray();
+    after(); kick();
+  }
+  function after() {
+    hud();
+    if (G.lv && goalProgress() >= 1) return finish(true);
+    const ps = G.tray.map(p => p ? L.SHAPES[p.s] : null);
+    if (L.gameOver(G.board, ps)) return finish(false);
+  }
+
+  /* ---------- Fin de partida ---------- */
+  function finish(won) {
+    G.over = true; busy = true; hud();
+    setTimeout(async () => {
+      busy = false;
+      const ov = $("overlay"), isLast = G.lv && G.lvIdx === LEVELS.length - 1;
+      if (G.lv) {
+        if (won) {
+          const stars = G.undosUsed + G.hintsUsed === 0 ? 3 : G.undosUsed + G.hintsUsed <= 2 ? 2 : 1;
+          progress.stars[G.lvIdx] = Math.max(progress.stars[G.lvIdx] || 0, stars); persist();
+          Arcade.submitScore("stars", totalStars()); Arcade.haptic("success");
+          $("ovTitle").textContent = isLast ? "¡Todos los niveles completos!" : "¡Nivel completo!";
+          $("ovStars").textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
+          $("ovInfo").textContent = G.score + " puntos";
+          $("bNext").style.display = isLast ? "none" : ""; $("bRetry").textContent = "Repetir";
+          if ((G.lvIdx + 1) % 3 === 0) await Ads.interstitial();
+        } else {
+          Arcade.haptic("error");
+          $("ovTitle").textContent = "Sin movimientos"; $("ovStars").textContent = "";
+          $("ovInfo").textContent = "Ninguna pieza cabe. ¡Inténtalo otra vez!";
+          $("bNext").style.display = "none"; $("bRetry").textContent = "Reintentar";
+        }
+      } else {
+        const nuevo = G.score > progress.best;
+        if (nuevo) { progress.best = G.score; persist(); }
+        if (G.score > 0) Arcade.submitScore("classic", G.score);
+        Arcade.haptic(nuevo ? "success" : "error");
+        $("ovTitle").textContent = nuevo ? "¡Nuevo récord!" : "Fin de la partida"; $("ovStars").textContent = "";
+        $("ovInfo").textContent = G.score + " puntos · Mejor: " + progress.best;
+        $("bNext").style.display = "none"; $("bRetry").textContent = "Jugar de nuevo";
+        await Ads.interstitial();
+      }
+      ov.classList.add("on");
+    }, 650);
+  }
+
+  /* ---------- Botones ---------- */
+  $("undoBtn").onclick = async () => {
+    if (!G || !G.snap || G.over || busy) return;
+    if (G.undos <= 0) { const ok = await Ads.rewarded(); if (!ok) return; G.undos++; }
+    const s = JSON.parse(G.snap); Object.assign(G, s); G.undos--; G.undosUsed++; G.snap = null; G.hint = null; hintUntil = 0;
+    anims = []; msg("Jugada deshecha"); syncTray(false); hud(); kick();
+  };
+  $("hintBtn").onclick = async () => {
+    if (!G || G.over || busy) return;
+    let best = null, bs = -1e9;
+    G.tray.forEach((t, i) => { if (!t) return; const s = L.SHAPES[t.s], m = L.botMove(G.board, s); if (!m) return; const nb = G.board.slice(), r = L.place(nb, s, m[0], m[1], 1), sc = r.lines * 100 + r.gems * 60 - nb.filter(v => v).length; if (sc > bs) { bs = sc; best = { slot: i, x: m[0], y: m[1] }; } });
+    if (!best) return;
+    const ok = await Ads.rewarded(); if (!ok) return;
+    G.hintsUsed++; hintUntil = performance.now() + 2500; G.hint = best; msg("Pista: mira la zona resaltada"); kick();
+  };
+  $("restartBtn").onclick = () => { if (G) start(G.mode, G.lvIdx); };
+  $("menuBtn").onclick = () => showMenu();
+  $("bMenu").onclick = () => { $("overlay").classList.remove("on"); showMenu(); };
+  $("bRetry").onclick = () => { $("overlay").classList.remove("on"); start(G.mode, G.lvIdx); };
+  $("bNext").onclick = () => { $("overlay").classList.remove("on"); start("level", G.lvIdx + 1); };
+  $("classic").onclick = () => start("classic");
+
+  function start(mode, idx) {
+    newGame(mode, idx);
+    $("sMenu").classList.remove("on"); $("sGame").classList.add("on");
+    msg(G.lv ? "" : "Arrastra las piezas al tablero"); busy = false; drag = null; anims = []; hintUntil = 0; popAt.fill(-1e9); $("pops").innerHTML = "";
+    hud();
+    if (!initGL()) return;
+    applyTheme(); syncTray(true); resize();
+  }
+  function unlocked(i) { return i === 0 || (progress.stars[i - 1] || 0) > 0; }
+  function showMenu() {
+    $("sGame").classList.remove("on"); $("sMenu").classList.add("on");
+    $("bestTxt").textContent = "Mejor: " + progress.best;
+    const grid = $("grid"); grid.innerHTML = "";
+    LEVELS.forEach((lv, i) => {
+      const b = document.createElement("button"), ok = unlocked(i), st = progress.stars[i] || 0;
+      b.innerHTML = (i + 1) + "<small>" + (ok ? "★".repeat(st) + "☆".repeat(3 - st) : "") + "</small>";
+      if (!ok) { b.className = "locked"; b.disabled = true; }
+      b.onclick = () => start("level", i);
+      grid.appendChild(b);
+    });
+  }
+  window.__bb = { get G() { return G; }, L, kick, dirty: () => { trayDirty = true; kick(); }, world: (x, z) => project(x, 0.3, z) };
+  showMenu();
+  Arcade.ready().then(function (session) { restore(session.state); showMenu(); });
+})();
+</script>
+</body>
+</html>

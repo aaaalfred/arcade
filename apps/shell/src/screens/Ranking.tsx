@@ -104,8 +104,8 @@ export function BoardView({ game, initialBoard }: { game: CatalogGame; initialBo
             <p class="empty" data-testid="board-empty">{t("ranking.empty")}</p>
           ) : (
             <ol class="board" data-testid="board">
-              {view.data.entries.map((e) => (
-                <li key={e.playerId} class={e.isMe ? "is-me" : ""} data-me={e.isMe ? "1" : undefined}>
+              {view.data.entries.map((e, i) => (
+                <li key={e.playerId} class={e.isMe ? "is-me" : ""} data-me={e.isMe ? "1" : undefined} style={{ "--i": Math.min(i, 10) }}>
                   <span class="board__rank num">{e.rank}</span>
                   <span class="board__name">{e.isMe ? `${e.nickname} · ${t("ranking.you")}` : e.nickname}</span>
                   <span class="board__value num">{formatValue(e.value, board.unit)}</span>

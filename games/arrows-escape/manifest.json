@@ -1,0 +1,22 @@
+{
+  "id": "arrows-escape",
+  "name": "Arrows Escape",
+  "tagline": "Haz escapar las flechas esquivando los bloques",
+  "version": "1.0.0",
+  "sdk": 1,
+  "entry": "index.html",
+  "orientation": "portrait",
+  "theme": {
+    "accent": "#3f8a52",
+    "background": "#fdfaf2",
+    "ink": "#2e473f",
+    "dark": { "accent": "#5fcf85", "background": "#14201c", "ink": "#cfe3d8" }
+  },
+  "icon": "icon.svg",
+  "progress": { "unit": "niveles", "total": 10 },
+  "boards": [
+    { "id": "stars", "name": "Estrellas totales", "sort": "desc", "min": 0, "max": 30, "integer": true, "unit": "★" }
+  ],
+  "ads": { "interstitial": true, "rewarded": true },
+  "dev": false
+}

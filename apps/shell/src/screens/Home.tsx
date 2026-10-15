@@ -25,7 +25,7 @@ function bestRank(id: string, ranks: Record<string, { all: number | null; weekly
   return best;
 }
 
-function Tile({ game, hero }: { game: CatalogGame; hero?: boolean }) {
+function Tile({ game, hero, index = 0 }: { game: CatalogGame; hero?: boolean; index?: number }) {
   const { store } = useServices();
   const m = game.manifest;
   const status = gameStatus(m, store.progress.value[m.id]);
@@ -43,7 +43,7 @@ function Tile({ game, hero }: { game: CatalogGame; hero?: boolean }) {
     : t("state.progress", { done: status.done, total: status.total, unit: m.progress.unit });
 
   return (
-    <button type="button" class={`tile${hero ? " tile--hero" : ""}`} style={gameVars(m)} onClick={open} data-testid={`tile-${m.id}`}>
+    <button type="button" class={`tile${hero ? " tile--hero" : ""}`} style={{ ...gameVars(m), "--i": Math.min(index, 6) }} onClick={open} data-testid={`tile-${m.id}`}>
       <GameIcon game={game} class="tile__icon" />
       <span class="tile__name">{m.name}</span>
       {m.tagline && <span class="tile__tag">{m.tagline}</span>}
@@ -74,15 +74,15 @@ export function Home() {
   const rest = catalog.filter((g) => g !== hero);
 
   return (
-    <main class="screen screen--tabs">
+    <main class="screen screen--tabs screen--stagger">
       <header class="page-head">
         <h1>{t("home.title")}</h1>
         {!store.online.value && <span class="chip">{t("common.offline")}</span>}
       </header>
       {catalog.length === 0 && <p class="empty">{t("home.empty")}</p>}
-      {hero && <Tile game={hero} hero />}
-      {rest.map((g) => (
-        <Tile key={g.manifest.id} game={g} />
+      {hero && <Tile game={hero} hero index={0} />}
+      {rest.map((g, i) => (
+        <Tile key={g.manifest.id} game={g} index={i + (hero ? 1 : 0)} />
       ))}
     </main>
   );

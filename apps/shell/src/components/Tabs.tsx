@@ -11,7 +11,8 @@ const TABS: Array<{ name: "home" | "ranking" | "profile"; icon: IconName; label:
 export function Tabs() {
   const current = route.value.name;
   return (
-    <nav class="tabs" aria-label="Principal">
+    <nav class="tabs" aria-label="Principal" style={{ "--tab-i": Math.max(0, TABS.findIndex((x) => x.name === current)) }}>
+      <span class="tabs__bar" aria-hidden="true" />
       {TABS.map((tab) => (
         <button
           key={tab.name} type="button" class="tab" aria-current={current === tab.name ? "page" : undefined}

@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Laberinto de un sentido · 10 niveles</title>
+<style>
+  :root {
+    --bg:#fdfaf2; --ink:#2e473f; --panel:#ffffff; --line:#e6dfcf; --muted:#7d877f; --text:#26332d;
+    --star:#f4a320; --star-off:#ddd6c4; --green:#3f8a52;
+    --goal:#3fbf7f; --wall:#e4572e; --player:#ff9f1c; --hint:#22a35a; --visit:#8ecae6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec;
+      --star-off:#3a4a43; --green:#5fcf85;
+      --goal:#4fd18f; --wall:#ff7a57; --player:#ffb44a; --hint:#5fe39a; --visit:#4a90b8;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec;
+    --star-off:#3a4a43; --green:#5fcf85;
+    --goal:#4fd18f; --wall:#ff7a57; --player:#ffb44a; --hint:#5fe39a; --visit:#4a90b8;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:Arial,Helvetica,sans-serif; overscroll-behavior:none; touch-action:manipulation; }
+  #app { max-width:520px; margin:0 auto; height:100%; display:flex; flex-direction:column; padding:10px 16px 14px; }
+  .screen { display:none; flex:1; flex-direction:column; min-height:0; }
+  .screen.on { display:flex; }
+  button { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; min-height:44px; cursor:pointer; }
+  button:active { transform:scale(.96); }
+  button.primary { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:bold; }
+  button:disabled { opacity:.4; }
+
+  /* menú */
+  h1 { font-size:22px; margin:14px 0 6px; text-align:center; color:var(--ink); }
+  .intro { text-align:center; color:var(--muted); margin:0 0 18px; line-height:1.4; font-size:14px; }
+  #grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  #grid button { padding:14px 0; font-size:18px; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  #grid button small { font-size:12px; color:var(--star); letter-spacing:1px; min-height:14px; }
+  #grid button.locked { opacity:.35; }
+
+  /* juego */
+  .top { display:flex; align-items:center; justify-content:space-between; min-height:48px; font-size:15px; }
+  .top .side { min-width:92px; }
+  .top .side:last-child { text-align:right; color:var(--muted); font-size:13px; }
+  .top b { color:var(--ink); }
+  #lvTitle { color:var(--ink); font-size:16px; }
+  #menuBtn { padding:6px 10px; font-size:16px; min-width:48px; }
+  #boardWrap { flex:1; position:relative; min-height:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  #noGL { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--muted); }
+  #msg { text-align:center; color:var(--muted); font-size:13px; min-height:18px; margin-bottom:4px; }
+  .actions { display:flex; gap:10px; justify-content:center; padding-top:6px; }
+  .actions button { min-width:104px; min-height:48px; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+
+  /* ventana de fin de nivel */
+  #overlay { position:fixed; inset:0; background:rgba(20,32,28,.55); display:none; align-items:center; justify-content:center; padding:24px; }
+  #overlay.on { display:flex; }
+  .card { background:var(--panel); border-radius:18px; padding:22px; width:100%; max-width:340px; text-align:center; border:1px solid var(--line); }
+  .card h2 { margin:0 0 6px; color:var(--ink); }
+  .big-stars { font-size:36px; color:var(--star); letter-spacing:4px; margin:8px 0; }
+  .card .row { display:flex; gap:8px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <section id="sMenu" class="screen on">
+    <h1>Laberinto de un sentido</h1>
+    <p class="intro">Lleva la bolita hasta la meta verde.<br>Las flechas solo se cruzan en su sentido y los bloques rojos son paredes.</p>
+    <div id="grid"></div>
+  </section>
+
+  <section id="sGame" class="screen">
+    <div class="top">
+      <div class="side"><button id="menuBtn" aria-label="Niveles">☰</button></div>
+      <div id="lvTitle">Nivel <b id="lvNum">1</b></div>
+      <div class="side">Movs <b id="mv">0</b> / par <b id="par">0</b></div>
+    </div>
+    <div id="boardWrap"><canvas id="cv"></canvas><div id="noGL">No se pudo iniciar el modo 3D en este dispositivo.</div></div>
+    <div id="msg"></div>
+    <div class="actions">
+      <button id="bUndo">↶ Deshacer</button>
+      <button id="bReset">⟲ Reiniciar</button>
+      <button id="bHint">💡 Pista</button>
+    </div>
+  </section>
+</div>
+
+<div id="overlay"><div class="card">
+  <h2>¡Nivel completo!</h2>
+  <div class="big-stars" id="ovStars"></div>
+  <div id="ovInfo" style="color:var(--muted)"></div>
+  <div class="row">
+    <button id="bMenu">Niveles</button>
+    <button id="bRetry">Repetir</button>
+    <button id="bNext" class="primary">Siguiente</button>
+  </div>
+</div></div>
+
+<script src="../_sdk/arcade-sdk.js" data-game="laberinto"></script>
+<script src="../_sdk/three.min.js"></script>
+<script src="logic.js"></script>
+<script src="levels.js"></script>
+<script>
+(function () {
+  "use strict";
+  const L = window.Logic;
+  const LEVELS = L.parseLevels(window.LEVELS_DATA);
+  const DIRS = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+
+  /* Anuncios: los gestiona la app (frecuencia, consentimiento, AdMob). El juego solo los pide. */
+  const Ads = {
+    interstitial: function () { return Arcade.ads.interstitial(); },
+    rewarded: function () { return Arcade.ads.rewarded(); }
+  };
+
+  /* ---------- Progreso guardado (lo persiste y sincroniza la app mediante el SDK) ---------- */
+  let progress = { stars: {}, completed: 0 };
+  const levelsDone = () => Object.keys(progress.stars).length;
+  const totalStars = () => Object.keys(progress.stars).reduce(function (n, k) { return n + (progress.stars[k] || 0); }, 0);
+  function save() { Arcade.save(progress, { progress: { value: levelsDone(), total: LEVELS.length } }); }
+
+  const $ = (id) => document.getElementById(id);
+  const sMenu = $("sMenu"), sGame = $("sGame"), cv = $("cv"), overlay = $("overlay");
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  /* ---------- Estado de la partida ---------- */
+  let cur = 0, lv = null, pos = [0, 0], hist = [], hintPath = null, hintTimer = 0, busyWin = false, raf = 0;
+
+  function buildMenu() {
+    const g = $("grid"); g.innerHTML = "";
+    LEVELS.forEach((l, i) => {
+      const unlocked = i === 0 || progress.stars[i - 1] !== undefined;
+      const st = progress.stars[i] || 0;
+      const b = document.createElement("button");
+      b.innerHTML = (i + 1) + "<small>" + (st ? "★".repeat(st) + "☆".repeat(3 - st) : "") + "</small>";
+      if (!unlocked) { b.className = "locked"; b.disabled = true; }
+      b.onclick = () => startLevel(i);
+      g.appendChild(b);
+    });
+  }
+  function show(screen) { sMenu.classList.toggle("on", screen === "menu"); sGame.classList.toggle("on", screen === "game"); }
+
+  function startLevel(i) {
+    cur = i; lv = LEVELS[i];
+    pos = lv.start.slice(); hist = [pos.slice()]; hintPath = null; busyWin = false;
+    clearTimeout(hintTimer);
+    overlay.classList.remove("on"); $("msg").textContent = "";
+    $("lvNum").textContent = lv.id; $("par").textContent = lv.par;
+    show("game"); updateHud();
+    if (!initGL()) return;
+    buildScene();
+    resize();
+  }
+  function updateHud() {
+    $("mv").textContent = hist.length - 1;
+    $("bUndo").disabled = hist.length < 2 || busyWin;
+  }
+
+  /* =====================================================================
+   * Presentación 3D (three.js, vendorizado en ../_sdk/three.min.js)
+   * Unidades del mundo: 1 nodo a nodo = 1. x = columna, z = fila, y = altura.
+   * Los nodos son cruces; las aristas son tramos abiertos, de un sentido o paredes.
+   * ===================================================================== */
+  const ELEV = 68, Y_PAD = 0.09, R_BALL = 0.27;
+  let renderer = null, scene, camera, hemi, sun, boardGroup, plane, glOk = null, T = {};
+  let gBox, gCyl, gCone, gSph, gRing;
+  let mats = {}, layers = {}, ringPool = [], playerMesh, goalGroup, flashMesh;
+  let vis = [0, 0], moveAnim = null, bump = null, flash = null, winHop = null;
+
+  function initGL() {
+    if (glOk !== null) return glOk;
+    try {
+      if (!window.THREE) throw new Error("three.js no cargó");
+      renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setClearColor(0x000000, 0);
+      renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(30, 1, 0.5, 300);
+      hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.6); scene.add(hemi);
+      sun = new THREE.DirectionalLight(0xffffff, 0.7);
+      sun.position.set(-4, 12, 6); sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0008;
+      scene.add(sun, sun.target);
+      boardGroup = new THREE.Group(); scene.add(boardGroup);
+      gBox = new THREE.BoxGeometry(1, 1, 1);
+      gCyl = new THREE.CylinderGeometry(1, 1, 1, 16);
+      gSph = new THREE.SphereGeometry(1, 20, 14);
+      gCone = new THREE.ConeGeometry(0.17, 0.36, 3); gCone.rotateZ(-Math.PI / 2);   // punta hacia +x
+      gRing = new THREE.TorusGeometry(0.3, 0.035, 8, 28); gRing.rotateX(Math.PI / 2);
+      plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -Y_PAD);
+      cv.addEventListener("webglcontextlost", (e) => e.preventDefault());
+      cv.addEventListener("webglcontextrestored", () => draw());
+      glOk = true;
+    } catch (err) {
+      glOk = false; $("noGL").style.display = "flex"; cv.style.display = "none";
+      if (window.console) console.warn("[laberinto] WebGL no disponible:", err);
+    }
+    return glOk;
+  }
+
+  const wp = (r, c) => [c - (lv.n - 1) / 2, r - (lv.n - 1) / 2];   // nodo -> [x, z]
+
+  function readTheme() {
+    T = { ink: cssVar("--ink") || "#2e473f", panel: cssVar("--panel") || "#ffffff", line: cssVar("--line") || "#e6dfcf",
+          wall: cssVar("--wall") || "#e4572e", player: cssVar("--player") || "#ff9f1c", goal: cssVar("--goal") || "#3fbf7f",
+          hint: cssVar("--hint") || "#22a35a", visit: cssVar("--visit") || "#8ecae6", green: cssVar("--green") || "#3f8a52" };
+    T.dark = new THREE.Color(cssVar("--bg") || "#fff").getHSL({}).l < 0.5;
+  }
+  // Pinta los materiales con la paleta CSS actual (también al cambiar claro/oscuro sin recargar)
+  function applyColors() {
+    if (!glOk) return;
+    readTheme();
+    const k = T.dark ? 0.9 : 1, col = (h) => new THREE.Color(h).multiplyScalar(k);
+    const track = new THREE.Color(T.line).lerp(new THREE.Color(T.ink), T.dark ? 0.2 : 0.55);
+    mats.slab.color.set(T.panel); mats.rim.color.set(T.line);
+    mats.track.color.copy(track); mats.pad.color.copy(track).lerp(new THREE.Color(T.ink), 0.35);
+    mats.arrow.color.copy(col(T.green));
+    mats.wall.color.copy(col(T.wall));
+    mats.player.color.copy(col(T.player));
+    mats.goal.color.copy(col(T.goal));
+    mats.visit.color.copy(col(T.visit)); mats.hint.color.copy(col(T.hint));
+    mats.ring.color.copy(col(T.green));
+    mats.flash.color.copy(col(T.wall));
+    draw();
+  }
+  const mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  if (mq && mq.addEventListener) mq.addEventListener("change", () => applyColors());
+  new MutationObserver(() => applyColors()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  function disposeBoard() {
+    boardGroup.children.slice().forEach((o) => {
+      boardGroup.remove(o);
+      if (o.userData.ownGeo && o.geometry) o.geometry.dispose();
+    });
+    Object.keys(mats).forEach((k) => mats[k].dispose());
+    mats = {}; layers = {}; ringPool = [];
+  }
+
+  const dummy = typeof THREE !== "undefined" ? new THREE.Object3D() : null;
+  function put(im, i, x, y, z, ry, sx, sy, sz) {
+    dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.set(sx, sy, sz); dummy.updateMatrix();
+    im.setMatrixAt(i, dummy.matrix);
+  }
+  function inst(geo, mat, count, shadow, recv) {
+    const im = new THREE.InstancedMesh(geo, mat, Math.max(1, count));
+    im.castShadow = !!shadow; im.receiveShadow = !!recv; im.count = count; im.frustumCulled = false;
+    boardGroup.add(im); return im;
+  }
+  const std = (rough) => new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: rough });
+
+  // Capa de camino (tramos + tapones en los nodos) reutilizable para el rastro y la pista
+  function makeLayer(mat, width, y, padR) {
+    const n = lv.n, maxE = 2 * n * (n - 1);
+    const bars = inst(gBox, mat, maxE, false, false), pads = inst(gCyl, mat, n * n, false, false);
+    bars.count = 0; pads.count = 0;
+    return {
+      bars, pads,
+      set(nodes, dedupe) {
+        let nb = 0, np = 0; const eSeen = {}, nSeen = {};
+        for (let i = 0; i < nodes.length; i++) {
+          const a = nodes[i], ka = a[0] * n + a[1];
+          if (!nSeen[ka]) { nSeen[ka] = 1; const p = wp(a[0], a[1]); put(pads, np++, p[0], y, p[1], 0, padR, 0.04, padR); }
+          if (i === 0) continue;
+          const b = nodes[i - 1], kb = b[0] * n + b[1];
+          if (dedupe) { const key = Math.min(ka, kb) * 100 + Math.max(ka, kb); if (eSeen[key]) continue; eSeen[key] = 1; }
+          const p = wp(a[0], a[1]), q = wp(b[0], b[1]);
+          put(bars, nb++, (p[0] + q[0]) / 2, y, (p[1] + q[1]) / 2, p[0] === q[0] ? Math.PI / 2 : 0, 1, 0.04, width);
+        }
+        bars.count = nb; pads.count = np;
+        bars.instanceMatrix.needsUpdate = true; pads.instanceMatrix.needsUpdate = true;
+      }
+    };
+  }
+
+  function buildScene() {
+    disposeBoard();
+    const n = lv.n;
+    mats = { slab: std(0.85), rim: std(0.9), track: std(0.8), pad: std(0.7), arrow: std(0.5), wall: std(0.55), player: std(0.35),
+             goal: std(0.5), visit: std(0.7), hint: std(0.6), ring: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+             flash: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }) };
+
+    // losa + borde
+    const bs = n - 1 + 1.9;
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(bs, 0.5, bs), mats.slab);
+    slab.position.y = -0.25; slab.receiveShadow = true; slab.userData.ownGeo = true;
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(bs + 0.3, 0.3, bs + 0.3), mats.rim);
+    rim.position.y = -0.62; rim.userData.ownGeo = true;
+    boardGroup.add(slab, rim);
+
+    // aristas: abiertas / un sentido / pared
+    const open = [], one = [], walls = [];
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+      if (c < n - 1) { const e = lv.H[r][c]; (e === 0 ? walls : e === 1 ? open : one).push([r, c, true, e]); }
+      if (r < n - 1) { const e = lv.V[r][c]; (e === 0 ? walls : e === 1 ? open : one).push([r, c, false, e]); }
+    }
+    const tracks = open.concat(one);
+    const imT = inst(gBox, mats.track, tracks.length, false, true);
+    tracks.forEach((t, i) => {
+      const p = wp(t[0], t[1]), mx = p[0] + (t[2] ? 0.5 : 0), mz = p[1] + (t[2] ? 0 : 0.5);
+      put(imT, i, mx, 0.035, mz, t[2] ? 0 : Math.PI / 2, 1, 0.07, 0.24);
+    });
+    const imA = inst(gCone, mats.arrow, one.length, true, false);
+    one.forEach((t, i) => {
+      const p = wp(t[0], t[1]), mx = p[0] + (t[2] ? 0.5 : 0), mz = p[1] + (t[2] ? 0 : 0.5), s = t[3] === 2 ? 1 : -1;
+      const dx = t[2] ? s : 0, dz = t[2] ? 0 : s;
+      put(imA, i, mx, 0.15, mz, Math.atan2(-dz, dx), 1, 0.6, 1.35);
+    });
+    const imW = inst(gBox, mats.wall, walls.length, true, true);
+    walls.forEach((t, i) => {
+      const p = wp(t[0], t[1]), mx = p[0] + (t[2] ? 0.5 : 0), mz = p[1] + (t[2] ? 0 : 0.5);
+      put(imW, i, mx, 0.23, mz, t[2] ? 0 : Math.PI / 2, 0.22, 0.46, 0.68);
+    });
+    const imP = inst(gCyl, mats.pad, n * n, false, true);
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) { const p = wp(r, c); put(imP, r * n + c, p[0], Y_PAD / 2, p[1], 0, 0.17, Y_PAD, 0.17); }
+
+    layers.trail = makeLayer(mats.visit, 0.12, 0.085, 0.13);
+    layers.hint = makeLayer(mats.hint, 0.16, 0.115, 0.17);
+
+    // meta: base + bandera
+    goalGroup = new THREE.Group();
+    const gb = new THREE.Mesh(gCyl, mats.goal); gb.scale.set(0.34, 0.12, 0.34); gb.position.y = 0.06; gb.castShadow = true;
+    const pole = new THREE.Mesh(gCyl, mats.goal); pole.scale.set(0.03, 0.7, 0.03); pole.position.set(-0.17, 0.42, -0.17); pole.castShadow = true;
+    const flag = new THREE.Mesh(gBox, mats.goal); flag.scale.set(0.3, 0.2, 0.03); flag.position.set(-0.02, 0.66, -0.17); flag.castShadow = true;
+    goalGroup.add(gb, pole, flag);
+    const gp = wp(lv.goal[0], lv.goal[1]); goalGroup.position.set(gp[0], 0, gp[1]);
+    boardGroup.add(goalGroup);
+
+    // anillos de movimientos posibles
+    for (let i = 0; i < 4; i++) { const m = new THREE.Mesh(gRing, mats.ring); m.position.y = 0.13; m.visible = false; boardGroup.add(m); ringPool.push(m); }
+
+    // bola
+    playerMesh = new THREE.Mesh(gSph, mats.player); playerMesh.scale.setScalar(R_BALL); playerMesh.castShadow = true; boardGroup.add(playerMesh);
+    // destello de movimiento bloqueado
+    flashMesh = new THREE.Mesh(gBox, mats.flash); flashMesh.visible = false; boardGroup.add(flashMesh);
+
+    const half = n / 2 + 2;
+    const sc = sun.shadow.camera; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 1; sc.far = 40; sc.updateProjectionMatrix();
+    sun.position.set(-half * 0.5, 12, half * 0.8); sun.target.position.set(0, 0, 0);
+
+    const sp = wp(pos[0], pos[1]); vis = [sp[0], sp[1]];
+    moveAnim = bump = flash = winHop = null;
+    applyColors();
+    syncLayers();
+  }
+
+  function syncLayers() {
+    if (!glOk || !layers.trail) return;
+    layers.trail.set(hist, true);
+    layers.hint.set(hintPath || [], false);
+    layers.hint.bars.visible = layers.hint.pads.visible = !!hintPath;
+  }
+
+  /* ---------- Cámara: inclinada, encuadra todo el tablero en cualquier pantalla ---------- */
+  const v1 = new THREE.Vector3();
+  function resize() {
+    if (!lv || !glOk) return;
+    const wrap = $("boardWrap"), W = Math.max(200, wrap.clientWidth), H = Math.max(200, wrap.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    const el = ELEV * Math.PI / 180, hw = (lv.n - 1) / 2 + 1.0;
+    const corners = [[-hw, 0, -hw], [hw, 0, -hw], [-hw, 0, hw], [hw, 0, hw], [-hw, 0.9, -hw], [hw, 0.9, -hw]];
+    let lo = 2, hi = 250;
+    for (let k = 0; k < 28; k++) {
+      const D = (lo + hi) / 2;
+      camera.position.set(0, D * Math.sin(el), D * Math.cos(el)); camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      const fits = corners.every((c) => { v1.set(c[0], c[1], c[2]).project(camera); return Math.abs(v1.x) <= 0.97 && Math.abs(v1.y) <= 0.97; });
+      if (fits) hi = D; else lo = D;
+    }
+    camera.position.set(0, hi * Math.sin(el), hi * Math.cos(el)); camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+    draw();
+  }
+  window.addEventListener("resize", () => { if (sGame.classList.contains("on")) resize(); });
+
+  // Para pruebas E2E: posición en pantalla (px de página del iframe) del centro de un nodo
+  window.__laberintoCellToScreen = function (r, c) {
+    const rect = cv.getBoundingClientRect(), p = wp(r, c);
+    v1.set(p[0], Y_PAD, p[1]).project(camera);
+    return [rect.left + (v1.x + 1) / 2 * rect.width, rect.top + (1 - v1.y) / 2 * rect.height];
+  };
+  // Para pruebas: abre un nivel directamente (aunque esté bloqueado en el menú)
+  window.__laberintoOpen = function (i) { startLevel(i); };
+
+  function draw() {
+    if (!glOk || !lv || !playerMesh) return;
+    let px = vis[0], pz = vis[1], py = R_BALL + Y_PAD - 0.04;
+    if (bump) { const k = Math.sin(bump.t * Math.PI) * 0.22; px += bump.dx * k; pz += bump.dz * k; }
+    if (moveAnim) py += Math.sin(moveAnim.t * Math.PI) * 0.16;
+    if (winHop) py += Math.abs(Math.sin(winHop.t * Math.PI * 2)) * 0.5 * (1 - winHop.t);
+    playerMesh.position.set(px, py, pz);
+    // anillos de los movimientos posibles (no mientras se anima la victoria)
+    let k = 0;
+    if (!busyWin) DIRS.forEach(([dr, dc]) => {
+      if (!L.canMove(lv, pos[0], pos[1], dr, dc)) return;
+      const q = wp(pos[0] + dr, pos[1] + dc), m = ringPool[k++];
+      m.position.set(q[0], 0.13, q[1]); m.visible = true;
+    });
+    for (; k < 4; k++) ringPool[k].visible = false;
+    if (flash) {
+      flashMesh.visible = true; flashMesh.position.set(flash.x, flash.y, flash.z); flashMesh.rotation.y = flash.ry; flashMesh.scale.set(flash.sx, flash.sy, flash.sz);
+      mats.flash.opacity = 0.75 * (1 - flash.t);
+    } else flashMesh.visible = false;
+    renderer.render(scene, camera);
+  }
+
+  /* ---------- Animación (el bucle solo corre mientras hay algo moviéndose) ---------- */
+  function loop(now) {
+    raf = 0;
+    const dt = Math.min(0.05, (now - (loop.t || now)) / 1000); loop.t = now;
+    let busy = false;
+    if (moveAnim) {
+      moveAnim.t += dt / moveAnim.d;
+      if (moveAnim.t >= 1) { vis = moveAnim.to.slice(); moveAnim = null; }
+      else { vis = [moveAnim.from[0] + (moveAnim.to[0] - moveAnim.from[0]) * moveAnim.t, moveAnim.from[1] + (moveAnim.to[1] - moveAnim.from[1]) * moveAnim.t]; busy = true; }
+    }
+    if (bump) { bump.t += dt / 0.28; if (bump.t >= 1) bump = null; else busy = true; }
+    if (flash) { flash.t += dt / 0.45; if (flash.t >= 1) flash = null; else busy = true; }
+    if (winHop) { winHop.t += dt / 0.9; if (winHop.t >= 1) winHop = null; else busy = true; }
+    draw();
+    if (busy) raf = requestAnimationFrame(loop);
+  }
+  function kick() { if (!raf) { loop.t = 0; raf = requestAnimationFrame(loop); } }
+
+  function glideTo(r, c, d) {
+    const p = wp(r, c);
+    moveAnim = { from: vis.slice(), to: p, t: 0, d: d || 0.17 };
+    kick();
+  }
+
+  /* ---------- Entrada: el toque se proyecta sobre el plano del tablero; vale tocar hacia cualquier lado de la bola ---------- */
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), hit = new THREE.Vector3();
+  cv.addEventListener("pointerdown", (ev) => {
+    if (!glOk || !lv || busyWin || overlay.classList.contains("on")) return;
+    const rect = cv.getBoundingClientRect();
+    ndc.set(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    if (!ray.ray.intersectPlane(plane, hit)) return;
+    const p = wp(pos[0], pos[1]), dx = hit.x - p[0], dz = hit.z - p[1];
+    if (Math.max(Math.abs(dx), Math.abs(dz)) < 0.35) return;       // toque sobre la propia bola
+    if (Math.abs(dx) >= Math.abs(dz)) tryMove(0, dx > 0 ? 1 : -1); else tryMove(dz > 0 ? 1 : -1, 0);
+  });
+  const KEYS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  window.addEventListener("keydown", (ev) => {
+    if (KEYS[ev.key]) { ev.preventDefault(); tryMove(KEYS[ev.key][0], KEYS[ev.key][1]); }
+  });
+  function hasMove() { return DIRS.some(([dr, dc]) => L.canMove(lv, pos[0], pos[1], dr, dc)); }
+
+  function tryMove(dr, dc) {
+    if (!glOk || !lv || busyWin || overlay.classList.contains("on") || !sGame.classList.contains("on")) return;
+    const r = pos[0] + dr, c = pos[1] + dc;
+    if (r < 0 || c < 0 || r >= lv.n || c >= lv.n) { bumpAt(dr, dc, null); return; }
+    if (L.canMove(lv, pos[0], pos[1], dr, dc)) {
+      pos = [r, c]; hist.push(pos.slice()); hintPath = null; $("msg").textContent = "";
+      Arcade.haptic("light");
+      glideTo(r, c); syncLayers(); updateHud();
+      if (r === lv.goal[0] && c === lv.goal[1]) win();
+      else if (!hasMove()) $("msg").textContent = "Sin salida: usa Deshacer o Reiniciar.";
+    } else bumpAt(dr, dc, [r, c]);
+  }
+  // Movimiento imposible: la bola topa y destella la pared o la flecha en contra
+  function bumpAt(dr, dc, to) {
+    const p = wp(pos[0], pos[1]);
+    bump = { t: 0, dx: dc, dz: dr };
+    if (to) {
+      const horiz = dc !== 0, e = horiz ? lv.H[pos[0]][Math.min(pos[1], to[1])] : lv.V[Math.min(pos[0], to[0])][pos[1]];
+      const mx = p[0] + dc * 0.5, mz = p[1] + dr * 0.5, ry = horiz ? 0 : Math.PI / 2;
+      flash = e === 0 ? { t: 0, x: mx, y: 0.23, z: mz, ry, sx: 0.3, sy: 0.54, sz: 0.76 }
+                      : { t: 0, x: mx, y: 0.1, z: mz, ry, sx: 1, sy: 0.08, sz: 0.3 };
+    }
+    Arcade.haptic("error");
+    kick();
+  }
+
+  /* ---------- Botones ---------- */
+  $("bUndo").onclick = () => {
+    if (busyWin || hist.length < 2) return;
+    hist.pop(); pos = hist[hist.length - 1].slice(); hintPath = null; $("msg").textContent = "";
+    glideTo(pos[0], pos[1], 0.12); syncLayers(); updateHud();
+  };
+  $("bReset").onclick = () => startLevel(cur);
+  $("menuBtn").onclick = () => { buildMenu(); show("menu"); };
+  $("bMenu").onclick = () => { overlay.classList.remove("on"); buildMenu(); show("menu"); };
+  $("bRetry").onclick = () => startLevel(cur);
+  $("bNext").onclick = () => startLevel(Math.min(cur + 1, LEVELS.length - 1));
+  $("bHint").onclick = async () => {
+    if (busyWin) return;
+    const ok = await Ads.rewarded(); if (!ok) return;
+    const path = L.solve(lv, pos[0], pos[1], false);
+    if (!path) { $("msg").textContent = "Desde aquí no hay salida. Deshaz movimientos."; return; }
+    hintPath = path; syncLayers(); draw();
+    clearTimeout(hintTimer); hintTimer = setTimeout(() => { hintPath = null; syncLayers(); draw(); }, 3000);
+  };
+
+  /* ---------- Victoria ---------- */
+  function win() {
+    busyWin = true; updateHud();
+    const moves = hist.length - 1, st = L.stars(moves, lv.par), level = cur;
+    if (!progress.stars[level] || st > progress.stars[level]) progress.stars[level] = st;
+    progress.completed = (progress.completed || 0) + 1; save();
+    Arcade.submitScore("stars", totalStars());
+    Arcade.haptic("success");
+    winHop = { t: 0 }; kick();
+    $("ovStars").textContent = "★".repeat(st) + "☆".repeat(3 - st);
+    $("ovInfo").textContent = moves + " movimientos (par " + lv.par + ")";
+    $("bNext").style.display = level < LEVELS.length - 1 ? "" : "none";
+    setTimeout(async () => {
+      if (progress.completed % 3 === 0) await Ads.interstitial(); // anuncio cada 3 niveles completados
+      if (cur === level && busyWin) overlay.classList.add("on");
+    }, 700);
+  }
+
+  Arcade.ready().then(function (session) {
+    const s = session.state;
+    if (s && typeof s === "object" && s.stars && typeof s.stars === "object") {
+      const clean = {};
+      Object.keys(s.stars).forEach(function (k) {
+        const i = +k, v = +s.stars[k];
+        if (Number.isInteger(i) && i >= 0 && i < LEVELS.length && v >= 1 && v <= 3) clean[i] = Math.floor(v);
+      });
+      progress = { stars: clean, completed: +s.completed || 0 };
+    }
+    buildMenu();
+  });
+  buildMenu();
+})();
+</script>
+</body>
+</html>

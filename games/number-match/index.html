@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Suma 10 · 10 etapas</title>
+<style>
+  :root {
+    --bg:#fdfaf2; --ink:#2e473f; --panel:#ffffff; --line:#e6dfcf; --muted:#7d877f; --text:#26332d;
+    --star:#f4a320; --star-off:#ddd6c4; --green:#3f8a52; --red:#d9534f; --hint:#f4a320;
+    --d1:#3f8a52; --d2:#2f7fb0; --d3:#8a5fb5; --d4:#d98a1f; --d5:#c0504d; --d6:#1f9a8a; --d7:#7a8f2a; --d8:#b5568a; --d9:#5a6b78;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec;
+      --star-off:#3a4a43; --green:#5fcf85; --red:#ff7a72; --hint:#f4b84a;
+      --d1:#5fcf85; --d2:#5db4e6; --d3:#b08ae0; --d4:#f0a847; --d5:#ee7f7a; --d6:#46c9b6; --d7:#aac04a; --d8:#e07fb4; --d9:#93a6b4;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec;
+    --star-off:#3a4a43; --green:#5fcf85; --red:#ff7a72; --hint:#f4b84a;
+    --d1:#5fcf85; --d2:#5db4e6; --d3:#b08ae0; --d4:#f0a847; --d5:#ee7f7a; --d6:#46c9b6; --d7:#aac04a; --d8:#e07fb4; --d9:#93a6b4;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:Arial,Helvetica,sans-serif; overscroll-behavior:none; touch-action:manipulation; }
+  #app { max-width:520px; margin:0 auto; height:100%; display:flex; flex-direction:column; padding:10px 16px 14px; }
+  .screen { display:none; flex:1; flex-direction:column; min-height:0; }
+  .screen.on { display:flex; }
+  button { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; cursor:pointer; }
+  button:active { transform:scale(.96); }
+  button.primary { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:bold; }
+  button:disabled { opacity:.4; }
+
+  /* menú */
+  h1 { font-size:22px; margin:14px 0 6px; text-align:center; color:var(--ink); }
+  .intro { text-align:center; color:var(--muted); margin:0 0 18px; line-height:1.4; font-size:14px; }
+  #grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  #grid button { padding:14px 0; font-size:18px; display:flex; flex-direction:column; align-items:center; gap:2px; min-height:56px; }
+  #grid button small { font-size:12px; color:var(--star); letter-spacing:1px; min-height:14px; }
+  #grid button.locked { opacity:.35; }
+
+  /* juego */
+  .top { display:flex; align-items:center; justify-content:space-between; min-height:44px; }
+  .top .side { width:64px; }
+  .top .side:last-child { text-align:right; color:var(--muted); font-size:13px; }
+  #menuBtn { min-width:44px; min-height:44px; padding:6px 10px; font-size:18px; }
+  #stars { display:flex; gap:6px; font-size:28px; line-height:1; }
+  #stars span { color:var(--star); transition:color .25s, transform .25s; }
+  #stars span.off { color:var(--star-off); transform:scale(.85); }
+  #boardWrap { flex:1; position:relative; min-height:0; margin:0 -16px; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  #noGL { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--muted); }
+  #msg { text-align:center; color:var(--muted); font-size:13px; min-height:18px; margin:4px 0; }
+  .bottom { display:flex; justify-content:center; gap:22px; padding-top:6px; }
+  .tool { position:relative; width:58px; height:58px; padding:0; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+  .badge { position:absolute; top:-8px; right:-8px; min-width:22px; height:22px; border-radius:11px; background:#5cb82a; color:#fff; font-size:13px; font-weight:bold; display:flex; align-items:center; justify-content:center; padding:0 5px; border:2px solid var(--bg); }
+  .tool.pulse { outline:3px solid var(--star); }
+
+  /* ventana de fin de etapa */
+  #overlay { position:fixed; inset:0; background:rgba(20,32,28,.55); display:none; align-items:center; justify-content:center; padding:24px; }
+  #overlay.on { display:flex; }
+  .card { background:var(--panel); border-radius:18px; padding:22px; width:100%; max-width:340px; text-align:center; border:1px solid var(--line); }
+  .card h2 { margin:0 0 6px; color:var(--ink); }
+  .big-stars { font-size:36px; color:var(--star); letter-spacing:4px; margin:8px 0; }
+  .card .row { display:flex; gap:8px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+  .card .row button { min-height:44px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="sMenu" class="screen on">
+    <h1>Suma 10</h1>
+    <p class="intro">Une dos números iguales o que sumen 10.<br>Pueden estar juntos o con huecos en medio, en línea.<br>Limpia todo el tablero.</p>
+    <div id="grid"></div>
+  </section>
+
+  <section id="sGame" class="screen">
+    <div class="top">
+      <div class="side"><button id="menuBtn" aria-label="Etapas">☰</button></div>
+      <div id="stars"><span>★</span><span>★</span><span>★</span></div>
+      <div class="side">Etapa <b id="lvNum">1</b></div>
+    </div>
+    <div id="boardWrap"><canvas id="cv"></canvas><div id="noGL">No se pudo iniciar el modo 3D en este dispositivo.</div></div>
+    <div id="msg"></div>
+    <div class="bottom">
+      <button id="undoBtn" class="tool" aria-label="Deshacer">↶</button>
+      <button id="addBtn" class="tool" aria-label="Añadir números">+<span class="badge" id="addCount">5</span></button>
+      <button id="hintBtn" class="tool" aria-label="Pista"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#3f8a52" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z" fill="#3f8a52" fill-opacity=".85"/></svg><span class="badge" id="hintCount">3</span></button>
+    </div>
+  </section>
+</div>
+
+<div id="overlay"><div class="card">
+  <h2 id="ovTitle">¡Etapa completa!</h2>
+  <div class="big-stars" id="ovStars"></div>
+  <div id="ovInfo" style="color:var(--muted)"></div>
+  <div class="row">
+    <button id="bMenu">Etapas</button>
+    <button id="bRetry">Repetir</button>
+    <button id="bNext" class="primary">Siguiente</button>
+  </div>
+</div></div>
+
+<script src="../_sdk/arcade-sdk.js" data-game="number-match"></script>
+<script src="../_sdk/three.min.js"></script>
+<script src="logic.js"></script>
+<script src="levels.js"></script>
+<script>
+(function () {
+  "use strict";
+  const L = window.Logic, LEVELS = window.LEVELS_DATA;
+  const LIVES = 3, HINTS = 3;
+
+  /* Anuncios: los gestiona la app (frecuencia, consentimiento, AdMob). El juego solo los pide. */
+  const Ads = {
+    interstitial: function () { return Arcade.ads.interstitial(); },
+    rewarded: function () { return Arcade.ads.rewarded(); }
+  };
+
+  /* ---------- Progreso guardado (lo persiste y sincroniza la app mediante el SDK) ---------- */
+  let progress = { stars: {}, completed: 0 };
+  const levelsDone = () => Object.keys(progress.stars).length;
+  const totalStars = () => Object.keys(progress.stars).reduce(function (n, k) { return n + (progress.stars[k] || 0); }, 0);
+  function save() { Arcade.save(progress, { progress: { value: levelsDone(), total: LEVELS.length } }); }
+
+  const $ = (id) => document.getElementById(id);
+  const sMenu = $("sMenu"), sGame = $("sGame"), cv = $("cv"), overlay = $("overlay");
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  let cur = 0, lv = null, st = null, lives = LIVES, hints = HINTS, over = false, mistakes = 0;
+  let sel = -1, hintPair = null, bad = [], undoStack = [], raf = 0;
+
+  function buildMenu() {
+    const g = $("grid"); g.innerHTML = "";
+    LEVELS.forEach((l, i) => {
+      const unlocked = i === 0 || progress.stars[i - 1] !== undefined;
+      const n = progress.stars[i] || 0;
+      const b = document.createElement("button");
+      b.innerHTML = (i + 1) + "<small>" + (n ? "★".repeat(n) + "☆".repeat(3 - n) : "") + "</small>";
+      if (!unlocked) { b.className = "locked"; b.disabled = true; }
+      b.onclick = () => startLevel(i);
+      g.appendChild(b);
+    });
+  }
+  function show(screen) { sMenu.classList.toggle("on", screen === "menu"); sGame.classList.toggle("on", screen === "game"); }
+
+  function startLevel(i) {
+    cur = i; lv = LEVELS[i]; st = L.newState(lv); lives = LIVES; hints = HINTS; over = false; mistakes = 0;
+    sel = -1; hintPair = null; bad = []; undoStack = [];
+    overlay.classList.remove("on"); $("msg").textContent = ""; $("lvNum").textContent = lv.id;
+    show("game"); updateHud();
+    if (!initGL()) return;
+    applyTheme();
+    resize();              // fija la cámara con el tamaño real del lienzo
+    rebuildAll(true);
+    scrollT = scrollY = 0; clampScroll(true);
+    kick();
+  }
+
+  function updateHud() {
+    [...$("stars").children].forEach((s, k) => s.classList.toggle("off", k >= lives));
+    $("hintCount").textContent = hints; $("addCount").textContent = st ? st.adds : 0;
+    $("hintBtn").disabled = hints <= 0 || over;
+    $("addBtn").disabled = !st || !L.canAdd(st) || over;
+    $("undoBtn").disabled = !undoStack.length || over;
+  }
+
+  /* =====================================================================
+   * Presentación 3D (three.js, vendorizado en ../_sdk/three.min.js)
+   * Unidades del mundo: 1 celda = 1. x = columna (−4..4), z = fila (0..), y = altura.
+   * Cada ficha es una losa redondeada con el número dibujado en una CanvasTexture.
+   * ===================================================================== */
+  const MAX_TILES = 1024, COLS = L.W, ELEV = 58, HALF_W = 4.9, MARGIN = 0.35, TILE = 0.9, BEVEL = 0.04;
+  let renderer = null, scene, camera, hemi, sun, glOk = null, T = {};
+  let geoTile, geoHalo, geoBox, slab, rim, slabMat, rimMat, gridTex, tilesGroup, haloGroup, inst = [];
+  let mats = [], faceTex = [], halos = [];
+  let tiles = [], tileAt = [], ghosts = [], pool = [];
+  let scrollY = 0, scrollT = 0, camTop = -5, camBot = 5, rows = 0, dragging = false;
+  const UP = new THREE.Vector3(0, 1, 0), plane0 = new THREE.Plane(UP, 0), planeTop = new THREE.Plane(UP, -0.3);
+  const mP = new THREE.Vector3(), mS = new THREE.Vector3(), mQ = new THREE.Quaternion(), mM = new THREE.Matrix4();
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), hit = new THREE.Vector3(), v1 = new THREE.Vector3();
+
+  function roundedRect(w, r) {
+    const s = new THREE.Shape(), x = -w / 2, y = -w / 2;
+    s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+    s.lineTo(x + w, y + w - r); s.quadraticCurveTo(x + w, y + w, x + w - r, y + w);
+    s.lineTo(x + r, y + w); s.quadraticCurveTo(x, y + w, x, y + w - r);
+    s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+    return s;
+  }
+
+  function initGL() {
+    if (glOk !== null) return glOk;
+    try {
+      if (!window.THREE) throw new Error("three.js no cargó");
+      renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setClearColor(0x000000, 0);
+      renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(17, 1, 0.5, 400);
+      hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.55); scene.add(hemi);
+      sun = new THREE.DirectionalLight(0xffffff, 0.5);
+      sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0008;
+      scene.add(sun, sun.target);
+
+      // ficha: losa redondeada de 0.9, con la cara superior en y ≈ 0.44 (la base apoya en y = 0)
+      const body = TILE - 2 * BEVEL;
+      geoTile = new THREE.ExtrudeGeometry(roundedRect(body, 0.2), { depth: 0.34, bevelEnabled: true, bevelThickness: BEVEL, bevelSize: BEVEL, bevelSegments: 1, curveSegments: 3 });
+      geoTile.rotateX(-Math.PI / 2);
+      geoTile.computeBoundingBox(); geoTile.translate(0, -geoTile.boundingBox.min.y, 0);
+      geoTile.userData.capSize = body;
+      geoHalo = new THREE.ShapeGeometry(roundedRect(TILE + 0.16, 0.26), 5); geoHalo.rotateX(-Math.PI / 2);
+      geoBox = new THREE.BoxGeometry(1, 1, 1);
+
+      tilesGroup = new THREE.Group(); haloGroup = new THREE.Group(); scene.add(tilesGroup, haloGroup);
+      for (let d = 1; d <= 9; d++) {        // una InstancedMesh por dígito: 9 llamadas de dibujo en total, sean cuantas sean las fichas
+        const im = new THREE.InstancedMesh(geoTile, new THREE.MeshBasicMaterial(), MAX_TILES);
+        im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; im.count = 0; tilesGroup.add(im); inst[d] = im;
+      }
+      for (let i = 0; i < 4; i++) {
+        const h = new THREE.Mesh(geoHalo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false }));
+        h.position.y = 0.012; h.visible = false; haloGroup.add(h); halos.push(h);
+      }
+      slabMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
+      const sideMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
+      slab = new THREE.Mesh(geoBox, [sideMat, sideMat, slabMat, sideMat, sideMat, sideMat]);
+      slab.receiveShadow = true;
+      rimMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
+      rim = new THREE.Mesh(geoBox, rimMat);
+      scene.add(slab, rim);
+
+      cv.addEventListener("webglcontextlost", (e) => e.preventDefault());
+      cv.addEventListener("webglcontextrestored", () => draw());
+      glOk = true;
+    } catch (err) {
+      glOk = false; $("noGL").style.display = "flex"; cv.style.display = "none";
+      if (window.console) console.warn("[number-match] WebGL no disponible:", err);
+    }
+    return glOk;
+  }
+
+  /* ---------- Tema (claro/oscuro) y texturas generadas en código ---------- */
+  function themeKey() { return cssVar("--bg") + cssVar("--panel") + cssVar("--d1"); }
+  let appliedTheme = "";
+  function applyTheme() {
+    if (!glOk) return;
+    const key = themeKey(); if (key === appliedTheme) return; appliedTheme = key;
+    const C = (n, d) => new THREE.Color(cssVar(n) || d);
+    const panel = C("--panel", "#ffffff"), line = C("--line", "#e6dfcf"), ink = C("--ink", "#2e473f");
+    T = { panel, line, ink, green: C("--green", "#3f8a52"), red: C("--red", "#d9534f"), hint: C("--hint", "#f4a320") };
+    T.dark = new THREE.Color(cssVar("--bg") || "#fff").getHSL({}).l < 0.5;
+
+    // losa
+    slabMat.color.copy(panel).lerp(line, 0.18); slab.material.forEach((m) => { if (m !== slabMat) m.color.copy(panel).multiplyScalar(0.92); });
+    rimMat.color.copy(line);
+    if (gridTex) gridTex.dispose();
+    const g = document.createElement("canvas"); g.width = g.height = 64;
+    const x = g.getContext("2d"); x.fillStyle = "#" + panel.clone().lerp(line, 0.18).getHexString(); x.fillRect(0, 0, 64, 64);
+    x.fillStyle = "#" + panel.clone().lerp(line, T.dark ? 0.5 : 0.62).getHexString();
+    pathRound(x, 5, 5, 54, 54, 12); x.fill();
+    gridTex = new THREE.CanvasTexture(g); gridTex.wrapS = gridTex.wrapT = THREE.RepeatWrapping; gridTex.anisotropy = 4;
+    slabMat.map = gridTex; slabMat.color.set(0xffffff); slabMat.needsUpdate = true;
+
+    // fichas: una textura de cara por dígito
+    faceTex.forEach((t) => t && t.dispose()); faceTex = []; mats.forEach((m) => m && (m[0].dispose(), m[1].dispose())); mats = [];
+    for (let d = 1; d <= 9; d++) {
+      const dc = C("--d" + d, "#3f8a52");
+      const face = panel.clone().lerp(dc, T.dark ? 0.2 : 0.14);
+      const c = document.createElement("canvas"); c.width = c.height = 128;
+      const q = c.getContext("2d");
+      q.fillStyle = "#" + face.getHexString(); q.fillRect(0, 0, 128, 128);
+      q.strokeStyle = "#" + face.clone().lerp(dc, 0.35).getHexString(); q.lineWidth = 4;
+      pathRound(q, 10, 10, 108, 108, 22); q.stroke();
+      q.fillStyle = "#" + dc.getHexString(); q.textAlign = "center"; q.textBaseline = "middle";
+      q.font = "bold 84px Arial, Helvetica, sans-serif"; q.fillText(String(d), 64, 70);
+      const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+      const s = geoTile.userData.capSize;     // la UV de la tapa son sus coordenadas locales
+      tex.repeat.set(1 / s, 1 / s); tex.offset.set(0.5, 0.5);
+      faceTex[d] = tex;
+      mats[d] = [new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55 }),
+                 new THREE.MeshStandardMaterial({ color: dc.clone().lerp(panel, T.dark ? 0.1 : 0.0).multiplyScalar(T.dark ? 0.75 : 0.88), roughness: 0.5 })];
+    }
+    for (let d = 1; d <= 9; d++) inst[d].material = mats[d];
+    ghosts.forEach((t) => { t.m.material = mats[t.v]; });
+    updateWorld(); draw();
+  }
+  function pathRound(q, x, y, w, h, r) {
+    q.beginPath(); q.moveTo(x + r, y); q.arcTo(x + w, y, x + w, y + h, r); q.arcTo(x + w, y + h, x, y + h, r);
+    q.arcTo(x, y + h, x, y, r); q.arcTo(x, y, x + w, y, r); q.closePath();
+  }
+  if (window.matchMedia) {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onTheme = () => { if (glOk) { applyTheme(); draw(); } };
+    if (mq.addEventListener) mq.addEventListener("change", onTheme); else if (mq.addListener) mq.addListener(onTheme);
+  }
+  new MutationObserver(() => { if (glOk) { applyTheme(); draw(); } }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  /* ---------- Fichas ---------- */
+  const cellPos = (i) => [(i % COLS) - (COLS - 1) / 2, Math.floor(i / COLS)];
+
+  // Malla suelta solo para las fichas que vuelan al emparejarse (unas pocas a la vez)
+  function takeMesh(v) {
+    const m = pool.pop() || new THREE.Mesh(geoTile, mats[v]);
+    m.material = mats[v]; m.castShadow = true; m.receiveShadow = true; m.rotation.set(0, 0, 0); m.visible = true;
+    tilesGroup.add(m); return m;
+  }
+  function freeMesh(m) { tilesGroup.remove(m); m.scale.setScalar(1); pool.push(m); }
+  function newTile(v, s0) {
+    return { v, x: 0, z: 0, y: 0, s: s0, tx: 0, tz: 0, ty: 0, ts: 1, idx: -1, delay: 0 };
+  }
+
+  // Asigna a cada ficha su celda (las fichas vivas conservan el orden de lectura del tablero)
+  function layout() {
+    tileAt = []; let k = 0;
+    for (let i = 0; i < st.cells.length; i++) {
+      if (!st.cells[i]) continue;
+      const t = tiles[k++], p = cellPos(i);
+      t.idx = i; t.tx = p[0]; t.tz = p[1]; tileAt[i] = t;
+    }
+    const r = Math.ceil(st.cells.length / COLS);
+    if (r !== rows) { rows = r; updateWorld(); clampScroll(false); }
+  }
+  function rebuildAll(pop) {
+    tiles = [];
+    st.cells.forEach((v, i) => {
+      if (!v) return;
+      const t = newTile(v, pop ? 0.01 : 1), p = cellPos(i);
+      t.x = p[0]; t.z = p[1]; t.delay = pop ? Math.min(0.5, i * 0.012) : 0; tiles.push(t);
+    });
+    layout();
+    tiles.forEach((t) => { t.x = t.tx; t.z = t.tz; });
+  }
+
+  // Losa y base: ajusta su largo al número de filas
+  function updateWorld() {
+    if (!glOk || !slab) return;
+    const w = COLS - 1 + 2 * 0.5 + 2 * MARGIN, d = Math.max(1, rows) + 2 * MARGIN, zc = (Math.max(1, rows) - 1) / 2;
+    slab.scale.set(w, 0.5, d); slab.position.set(0, -0.25, zc);
+    rim.scale.set(w + 0.3, 0.3, d + 0.3); rim.position.set(0, -0.62, zc);
+    if (gridTex) { gridTex.repeat.set(w, d); gridTex.offset.set(1 - MARGIN, 1 - MARGIN); }   // las celdas casan con las fichas
+  }
+
+  /* ---------- Cámara: inclinada, 9 columnas a lo ancho; el tablero largo se desplaza arrastrando ---------- */
+  function placeCam(z) {
+    const D = placeCam.D || 20, el = ELEV * Math.PI / 180;
+    camera.position.set(0, D * Math.sin(el), z + D * Math.cos(el)); camera.lookAt(0, 0, z);
+    camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+  }
+  function zAtNdc(x, y) {
+    ndc.set(x, y); ray.setFromCamera(ndc, camera);
+    return ray.ray.intersectPlane(plane0, hit) ? [hit.x, hit.z] : [0, 0];
+  }
+  function resize() {
+    if (!glOk) return;
+    const wrap = $("boardWrap"), W = Math.max(200, wrap.clientWidth), H = Math.max(200, wrap.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    let lo = 2, hi = 400;
+    for (let k = 0; k < 28; k++) {            // distancia mínima con la losa completa a lo ancho en el borde inferior
+      placeCam.D = (lo + hi) / 2; placeCam(0);
+      if (zAtNdc(1, -1)[0] >= HALF_W) hi = placeCam.D; else lo = placeCam.D;
+    }
+    placeCam.D = hi; placeCam(0);
+    camTop = zAtNdc(0, 1)[1]; camBot = zAtNdc(0, -1)[1];   // z visible respecto al punto de mira
+    clampScroll(true);
+    draw();
+  }
+  window.addEventListener("resize", () => { if (sGame.classList.contains("on")) resize(); });
+
+  function scrollRange() {
+    const lo = -0.5 - MARGIN - 0.25 - camTop, hi = rows - 0.5 + MARGIN + 0.25 - camBot;
+    return lo > hi ? [lo, lo] : [lo, hi];   // tablero corto: pegado arriba
+  }
+  function clampScroll(snap) {
+    const r = scrollRange(); scrollT = Math.max(r[0], Math.min(r[1], scrollT));
+    if (snap) scrollY = scrollT;
+    kick();
+  }
+  function scrollToRow(row) {      // acerca una fila a la zona visible
+    const vt = scrollT + camTop + 0.6, vb = scrollT + camBot - 0.6;
+    if (row < vt) scrollT -= vt - row; else if (row > vb) scrollT += row - vb;
+    clampScroll(false);
+  }
+
+  // Para pruebas: posición en pantalla (px de página) del centro de una celda
+  window.__nmCellToScreen = function (i) {
+    const rect = cv.getBoundingClientRect(), p = cellPos(i);
+    v1.set(p[0], 0.3, p[1]).project(camera);
+    return [rect.left + (v1.x + 1) / 2 * rect.width, rect.top + (1 - v1.y) / 2 * rect.height];
+  };
+
+  /* ---------- Dibujo ---------- */
+  function haloSpecs() {
+    const out = [];
+    if (hintPair) hintPair.forEach((i) => out.push([i, T.hint]));
+    bad.forEach((i) => out.push([i, T.red]));
+    if (sel >= 0) out.push([sel, T.green]);
+    return out;
+  }
+  const badAmp = { v: 0 };
+  function draw() {
+    if (!glOk || !st) return;
+    placeCam(scrollY);
+    sun.target.position.set(0, 0, scrollY); sun.position.set(-3, 12, scrollY + 6);
+    const hz = (camBot - camTop) / 2 + 3, sc = sun.shadow.camera;
+    sc.left = -7; sc.right = 7; sc.top = hz; sc.bottom = -hz; sc.near = 1; sc.far = 40; sc.updateProjectionMatrix();
+    const cnt = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    tiles.forEach((t) => {
+      const isBad = badAmp.v > 0 && bad.indexOf(t.idx) >= 0, d = t.v;
+      mP.set(t.x + (isBad ? Math.sin(badAmp.v * 40) * 0.07 * badAmp.v : 0), t.y, t.z); mS.setScalar(Math.max(0.001, t.s));
+      mM.compose(mP, mQ, mS); inst[d].setMatrixAt(cnt[d]++, mM);
+    });
+    const lite = tiles.length > 260;   // tableros enormes: sin sombras de las fichas (ahorra una pasada)
+    for (let d = 1; d <= 9; d++) { inst[d].count = cnt[d]; inst[d].castShadow = !lite; inst[d].instanceMatrix.needsUpdate = true; }
+    const specs = haloSpecs();
+    halos.forEach((h, k) => {
+      const s = specs[k], t = s && tileAt[s[0]];
+      h.visible = !!t;
+      if (t) { h.position.set(t.x, 0.012, t.z); h.material.color.copy(s[1]); h.scale.setScalar(Math.max(0.01, t.s)); }
+    });
+    renderer.render(scene, camera);
+  }
+
+  /* ---------- Animación (solo mientras hay algo moviéndose) ---------- */
+  function loop(now) {
+    raf = 0;
+    const dt = Math.min(0.05, (now - (loop.t || now)) / 1000); loop.t = now;
+    const k = 1 - Math.exp(-dt * 16);
+    let busy = false;
+    tiles.forEach((t) => {
+      if (t.delay > 0) { t.delay -= dt; busy = true; return; }
+      const lifted = t.idx === sel, hinted = hintPair && hintPair.indexOf(t.idx) >= 0;
+      t.ty = lifted ? 0.42 : hinted ? 0.14 : 0; t.ts = lifted ? 1.07 : 1;
+      t.x += (t.tx - t.x) * k; t.z += (t.tz - t.z) * k; t.y += (t.ty - t.y) * k; t.s += (t.ts - t.s) * k;
+      if (Math.abs(t.tx - t.x) + Math.abs(t.tz - t.z) + Math.abs(t.ty - t.y) + Math.abs(t.ts - t.s) > 0.003) busy = true;
+      else { t.x = t.tx; t.z = t.tz; t.y = t.ty; t.s = t.ts; }
+    });
+    ghosts = ghosts.filter((g) => {
+      g.t += dt / 0.34;
+      if (g.t >= 1) { freeMesh(g.m); return false; }
+      const e = 1 - Math.pow(1 - g.t, 3);
+      g.m.position.set(g.x0 + (g.x1 - g.x0) * e, 0.42 + Math.sin(g.t * Math.PI) * 0.5, g.z0 + (g.z1 - g.z0) * e);
+      g.m.scale.setScalar(Math.max(0.001, 1.07 * (1 - e * e)));
+      g.m.rotation.y = e * 1.6 * g.dir;
+      busy = true; return true;
+    });
+    if (badAmp.v > 0) { badAmp.v = Math.max(0, badAmp.v - dt * 2.4); busy = true; }
+    if (Math.abs(scrollT - scrollY) > 0.004) { scrollY += (scrollT - scrollY) * (dragging ? 1 : k); busy = true; } else scrollY = scrollT;
+    draw();
+    if (busy) raf = requestAnimationFrame(loop);
+  }
+  function kick() { if (!raf && glOk && st) { loop.t = 0; raf = requestAnimationFrame(loop); } }
+  document.addEventListener("visibilitychange", () => { if (document.hidden && raf) { cancelAnimationFrame(raf); raf = 0; } else kick(); });
+
+  /* ---------- Entrada: arrastre vertical = desplazar; toque = elegir ficha ---------- */
+  let down = null;
+  cv.addEventListener("pointerdown", (ev) => {
+    if (!glOk || !st || overlay.classList.contains("on")) return;
+    down = { x: ev.clientX, y: ev.clientY, sy: scrollT, moved: false, id: ev.pointerId };
+    try { cv.setPointerCapture(ev.pointerId); } catch (e) {}
+  });
+  cv.addEventListener("pointermove", (ev) => {
+    if (!down || ev.pointerId !== down.id) return;
+    const dy = ev.clientY - down.y;
+    if (!down.moved && Math.abs(dy) > 8) down.moved = true;
+    if (down.moved) {
+      dragging = true;
+      scrollT = down.sy - dy * ((camBot - camTop) / Math.max(1, cv.clientHeight));
+      clampScroll(false);
+    }
+  });
+  function endPointer(ev, cancel) {
+    if (!down || ev.pointerId !== down.id) return;
+    const d = down; down = null; dragging = false;
+    if (!cancel && !d.moved) pickAt(ev.clientX, ev.clientY);
+  }
+  cv.addEventListener("pointerup", (ev) => endPointer(ev, false));
+  cv.addEventListener("pointercancel", (ev) => endPointer(ev, true));
+  cv.addEventListener("wheel", (ev) => { ev.preventDefault(); scrollT += ev.deltaY * 0.01; clampScroll(false); }, { passive: false });
+
+  function pickAt(cx, cy) {
+    if (over || !st) return;
+    const rect = cv.getBoundingClientRect();
+    ndc.set(((cx - rect.left) / rect.width) * 2 - 1, -((cy - rect.top) / rect.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    if (!ray.ray.intersectPlane(planeTop, hit)) return;
+    const col = Math.round(hit.x + (COLS - 1) / 2), row = Math.round(hit.z);
+    if (col < 0 || col >= COLS || row < 0) return;
+    tap(row * COLS + col);
+  }
+
+  /* ---------- Jugada ---------- */
+  function pushUndo() { undoStack.push({ st: L.clone(st), lives, mistakes }); if (undoStack.length > 50) undoStack.shift(); }
+  function say(t) { $("msg").textContent = t; }
+
+  function tap(k) {
+    if (over || !st.cells[k]) return;
+    if (sel === -1 || sel === k) { sel = sel === k ? -1 : k; if (sel >= 0) Arcade.haptic("light"); kick(); return; }
+    const a = sel; sel = -1;
+    if (L.canMatch(st.cells, a, k)) {
+      pushUndo();
+      const ta = tileAt[a], tb = tileAt[k], mx = (ta.x + tb.x) / 2, mz = (ta.z + tb.z) / 2;
+      [ta, tb].forEach((t, n) => {
+        tiles.splice(tiles.indexOf(t), 1);
+        ghosts.push({ m: takeMesh(t.v), v: t.v, t: 0, x0: t.x, z0: t.z, x1: mx, z1: mz, dir: n ? -1 : 1 });
+      });
+      L.applyMatch(st, a, k); hintPair = null; say("");
+      layout(); updateHud(); Arcade.haptic("medium");
+      kick(); checkEnd();
+    } else {
+      mistakes++; lives--; bad = [a, k]; hintPair = null; badAmp.v = 1;
+      say(L.compatible(st.cells[a], st.cells[k]) ? "Hay números en medio." : "Deben ser iguales o sumar 10.");
+      Arcade.haptic("error"); updateHud(); kick();
+      setTimeout(() => { bad = []; kick(); }, 450);
+      if (lives <= 0) { over = true; updateHud(); setTimeout(() => finish(false), 600); }
+    }
+  }
+
+  function checkEnd() {
+    if (L.isWon(st)) { over = true; updateHud(); setTimeout(() => finish(true), 500); }
+    else if (L.isStuck(st)) { over = true; updateHud(); setTimeout(() => finish(false, true), 500); }
+  }
+
+  $("addBtn").onclick = () => {
+    if (over || !L.canAdd(st)) return;
+    pushUndo(); L.applyAdd(st); sel = -1; hintPair = null; say("");
+    const before = tiles.length;
+    // las fichas nuevas son las copias añadidas al final, en orden
+    const alive = st.cells.filter((x) => x), fresh = alive.slice(before);
+    fresh.forEach((v, n) => { const t = newTile(v, 0.01); t.delay = Math.min(0.6, n * 0.015); tiles.push(t); });
+    layout();
+    fresh.forEach((v, n) => { const t = tiles[before + n]; t.x = t.tx; t.z = t.tz; });
+    updateHud(); Arcade.haptic("light");
+    scrollT = scrollRange()[1]; clampScroll(false);   // baja a las filas nuevas
+  };
+  $("undoBtn").onclick = () => {
+    if (over || !undoStack.length) return;
+    const u = undoStack.pop(); st = u.st; sel = -1; hintPair = null; bad = []; say("");
+    rebuildAll(true); updateHud(); kick();
+  };
+  $("hintBtn").onclick = async () => {
+    if (over || hints <= 0 || hintPair) return;
+    const p = L.findPairs(st.cells);
+    if (!p.length) {
+      say(L.canAdd(st) ? "No hay parejas: usa «+»." : "Sin movimientos.");
+      $("addBtn").classList.add("pulse"); setTimeout(() => $("addBtn").classList.remove("pulse"), 1200); return;
+    }
+    const ok = await Ads.rewarded(); if (!ok) return;
+    hints--; hintPair = p[0]; sel = -1; updateHud();
+    scrollToRow(Math.floor(hintPair[0] / COLS)); kick();
+  };
+
+  /* ---------- Fin de etapa ---------- */
+  function finish(won, stuck) {
+    if (won) {
+      const n = Math.max(1, lives);
+      if (!progress.stars[cur] || n > progress.stars[cur]) progress.stars[cur] = n;
+      progress.completed = (progress.completed || 0) + 1; save();
+      Arcade.submitScore("stars", totalStars());
+      Arcade.haptic("success");
+      $("ovTitle").textContent = "¡Etapa completa!";
+      $("ovStars").textContent = "★".repeat(n) + "☆".repeat(3 - n);
+      $("ovInfo").textContent = mistakes ? "Errores: " + mistakes : "¡Sin errores!";
+      $("bNext").style.display = cur < LEVELS.length - 1 ? "" : "none";
+    } else {
+      $("ovTitle").textContent = stuck ? "Sin movimientos" : "Te quedaste sin estrellas";
+      $("ovStars").textContent = "☆☆☆";
+      $("ovInfo").textContent = stuck ? "No quedan parejas ni «añadir». Prueba de nuevo." : "Inténtalo de nuevo";
+      $("bNext").style.display = "none";
+    }
+    setTimeout(async () => {
+      if (won && progress.completed % 3 === 0) await Ads.interstitial(); // anuncio cada 3 etapas
+      overlay.classList.add("on");
+    }, 200);
+  }
+
+  $("menuBtn").onclick = () => { buildMenu(); show("menu"); };
+  $("bMenu").onclick = () => { overlay.classList.remove("on"); buildMenu(); show("menu"); };
+  $("bRetry").onclick = () => startLevel(cur);
+  $("bNext").onclick = () => startLevel(Math.min(cur + 1, LEVELS.length - 1));
+
+  window.__nm = { get st() { return st; }, startLevel, get over() { return over; }, get progress() { return progress; } };
+
+  Arcade.ready().then(function (session) {
+    const s = session.state;
+    if (s && typeof s === "object" && s.stars && typeof s.stars === "object") progress = { stars: s.stars, completed: s.completed || 0 };
+    buildMenu();
+  });
+})();
+</script>
+</body>
+</html>

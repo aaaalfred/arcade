@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>2048 · Niveles y Clásico</title>
+<style>
+  :root {
+    --bg:#fdfaf2; --ink:#2e473f; --panel:#ffffff; --line:#e6dfcf; --muted:#7d877f; --text:#26332d;
+    --star:#f4a320; --star-off:#ddd6c4; --green:#3f8a52; --red:#d9534f;
+    --board:#d9d2bf; --cellbg:#e9e3d2; --block:#b9b2a0;
+    --t2:#eaf4ee; --t4:#d3ebdc; --t8:#a8dcc0; --t16:#7fcfb0; --t32:#4fbcae; --t64:#3aa6b5;
+    --t128:#3b86c4; --t256:#5a69c9; --t512:#7c58c4; --t1024:#a24fb8; --t2048:#d4488f; --tbig:#e8623e;
+    --tdark:#2a4a3e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec;
+      --star-off:#3a4a43; --green:#5fcf85; --red:#ff7a72; --board:#2a3b35; --cellbg:#34473f; --block:#1a2622;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec;
+    --star-off:#3a4a43; --green:#5fcf85; --red:#ff7a72; --board:#2a3b35; --cellbg:#34473f; --block:#1a2622;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:Arial,Helvetica,sans-serif; overscroll-behavior:none; touch-action:manipulation; }
+  #app { max-width:520px; margin:0 auto; height:100%; display:flex; flex-direction:column; padding:10px 16px 14px; }
+  .screen { display:none; flex:1; flex-direction:column; min-height:0; }
+  .screen.on { display:flex; }
+  button { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; cursor:pointer; }
+  button:active { transform:scale(.96); }
+  button.primary { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:bold; }
+  button:disabled { opacity:.4; }
+
+  h1 { font-size:26px; margin:14px 0 6px; text-align:center; color:var(--ink); }
+  h3 { margin:18px 0 10px; color:var(--ink); font-size:15px; }
+  .intro { text-align:center; color:var(--muted); margin:0 0 14px; line-height:1.4; font-size:14px; }
+  #resumeBtn { display:none; width:100%; min-height:48px; margin:0 0 4px; }
+  #resumeBtn.on { display:block; }
+  #grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  #grid button { padding:14px 0; font-size:18px; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  #grid button small { font-size:12px; color:var(--star); letter-spacing:1px; min-height:14px; }
+  #grid button em { font-style:normal; font-size:10px; color:var(--muted); }
+  #grid button.locked { opacity:.35; }
+  #sizes { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  #sizes button { padding:10px 0; display:flex; flex-direction:column; align-items:center; gap:2px; font-size:16px; }
+  #sizes button small { font-size:11px; color:var(--muted); }
+
+  .top { display:flex; align-items:center; gap:8px; min-height:48px; }
+  #menuBtn { padding:6px 10px; font-size:16px; min-width:44px; min-height:44px; }
+  .box { flex:1; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:5px 8px; text-align:center; font-size:11px; color:var(--muted); }
+  .box b { display:block; font-size:18px; color:var(--text); }
+  #goal { text-align:center; color:var(--muted); font-size:13px; margin:8px 0 2px; min-height:18px; }
+  #goal b { color:var(--ink); }
+  #boardWrap { flex:1; position:relative; min-height:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  #noGL { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--muted); }
+  .bottom { display:flex; justify-content:center; gap:12px; padding-top:8px; }
+  .bottom button { min-width:92px; min-height:44px; position:relative; }
+  #undoCount { display:inline-block; min-width:20px; height:20px; line-height:20px; border-radius:10px; background:#5cb82a; color:#fff; font-size:12px; font-weight:bold; margin-left:4px; padding:0 4px; }
+
+  #overlay { position:fixed; inset:0; background:rgba(20,32,28,.55); display:none; align-items:center; justify-content:center; padding:24px; }
+  #overlay.on { display:flex; }
+  .card { background:var(--panel); border-radius:18px; padding:22px; width:100%; max-width:340px; text-align:center; border:1px solid var(--line); }
+  .card h2 { margin:0 0 6px; color:var(--ink); }
+  .big-stars { font-size:36px; color:var(--star); letter-spacing:4px; margin:8px 0; }
+  .card .row { display:flex; gap:8px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="sMenu" class="screen on">
+    <h1>2048</h1>
+    <p class="intro">Desliza para unir fichas iguales.<br>Alcanza la ficha objetivo de cada nivel.</p>
+    <button id="resumeBtn" class="primary"></button>
+    <h3>Niveles</h3>
+    <div id="grid"></div>
+    <h3>Clásico (infinito)</h3>
+    <div id="sizes"></div>
+  </section>
+
+  <section id="sGame" class="screen">
+    <div class="top">
+      <button id="menuBtn" aria-label="Menú">☰</button>
+      <div class="box">PUNTOS<b id="score">0</b></div>
+      <div class="box">MEJOR<b id="best">0</b></div>
+      <div class="box" id="movBox">MOVS<b id="moves">0</b></div>
+    </div>
+    <div id="goal"></div>
+    <div id="boardWrap"><canvas id="cv"></canvas><div id="noGL">No se pudo iniciar el modo 3D en este dispositivo.</div></div>
+    <div class="bottom">
+      <button id="undoBtn" aria-label="Deshacer">↶ Deshacer<span id="undoCount">3</span></button>
+      <button id="restartBtn" aria-label="Reiniciar">⟳ Reiniciar</button>
+    </div>
+  </section>
+</div>
+
+<div id="overlay"><div class="card">
+  <h2 id="ovTitle"></h2>
+  <div class="big-stars" id="ovStars"></div>
+  <div id="ovInfo" style="color:var(--muted)"></div>
+  <div class="row" id="ovRow"></div>
+</div></div>
+
+<script src="../_sdk/arcade-sdk.js" data-game="2048"></script>
+<script src="../_sdk/three.min.js"></script>
+<script src="logic.js"></script>
+<script src="levels.js"></script>
+<script>
+(function () {
+  "use strict";
+  const L = window.Logic, LEVELS = window.LEVELS_DATA;
+  const UNDOS = 3, CLASSIC_TARGET = 2048;
+
+  /* Anuncios: los gestiona la app (frecuencia, consentimiento, AdMob). El juego solo los pide. */
+  const Ads = {
+    interstitial: function () { return Arcade.ads.interstitial(); },
+    rewarded: function () { return Arcade.ads.rewarded(); }
+  };
+
+  /* ---------- Progreso guardado (lo persiste y sincroniza la app mediante el SDK) ----------
+     { stars: {nivel: 1..3}, best: {"L1": puntos, "C4": puntos}, game: partida en curso | null } */
+  let progress = { stars: {}, best: {}, game: null };
+  const levelsDone = () => Object.keys(progress.stars).filter((k) => progress.stars[k] > 0).length;
+  const totalStars = () => Object.keys(progress.stars).reduce((n, k) => n + (progress.stars[k] || 0), 0);
+  function save() { Arcade.save(progress, { progress: { value: levelsDone(), total: LEVELS.length } }); }
+  function saveGame() {
+    progress.game = { mode: mode, cur: cur, size: cfg.w, cells: cells.slice(), score: score, moves: moves, undos: undos, won: won, keepGoing: keepGoing };
+    save();
+  }
+  function clearGame() { progress.game = null; save(); }
+  // Valida la partida guardada (puede venir de otro dispositivo o de una versión anterior)
+  function validGame(g) {
+    if (!g || typeof g !== "object" || !Array.isArray(g.cells)) return false;
+    let w, h;
+    if (g.mode === "level") { const l = LEVELS[g.cur]; if (!l) return false; w = l.w; h = l.h; }
+    else if (g.mode === "classic" && [3, 4, 5, 6].indexOf(g.size) >= 0) { w = h = g.size; }
+    else return false;
+    if (g.cells.length !== w * h) return false;
+    return g.cells.every((v) => Number.isInteger(v) && v >= -1 && v <= 1 << 20) && Number.isFinite(g.score) && L.canMove(g.cells, w, h);
+  }
+  function submitBest() {
+    if (progress.best.C4 > 0) Arcade.submitScore("classic4", Math.min(4000000, Math.floor(progress.best.C4)));
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const sMenu = $("sMenu"), sGame = $("sGame"), cv = $("cv"), overlay = $("overlay");
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  /* ---------- estado ---------- */
+  let mode = "classic", cur = 0, cfg = null; // cfg: {w,h,target,blocks,maxMoves,s3,s2}
+  let cells = [], score = 0, moves = 0, undos = UNDOS, history = [], won = false, over = false, keepGoing = false;
+
+  const bestKey = () => mode === "level" ? "L" + cfg.id : "C" + cfg.w;
+
+  function buildMenu() {
+    const rb = $("resumeBtn"), g0 = progress.game;
+    if (g0) {
+      rb.textContent = "▶ Continuar: " + (g0.mode === "level" ? "Nivel " + LEVELS[g0.cur].id : "Clásico " + g0.size + "×" + g0.size) + " · " + g0.score + " pts";
+      rb.classList.add("on");
+    } else rb.classList.remove("on");
+    const g = $("grid"); g.innerHTML = "";
+    LEVELS.forEach((l, i) => {
+      const unlocked = i === 0 || (progress.stars[i - 1] || 0) > 0;
+      const st = progress.stars[i] || 0;
+      const b = document.createElement("button");
+      b.innerHTML = (i + 1) + "<small>" + (st ? "★".repeat(st) + "☆".repeat(3 - st) : "") + "</small><em>" + l.w + "×" + l.h + " · " + l.target + "</em>";
+      if (!unlocked) { b.className = "locked"; b.disabled = true; }
+      b.onclick = () => startLevel(i);
+      g.appendChild(b);
+    });
+    const s = $("sizes"); s.innerHTML = "";
+    [3, 4, 5, 6].forEach((n) => {
+      const b = document.createElement("button");
+      b.innerHTML = n + "×" + n + "<small>Mejor " + (progress.best["C" + n] || 0) + "</small>";
+      b.onclick = () => startClassic(n);
+      s.appendChild(b);
+    });
+  }
+  function show(screen) { sMenu.classList.toggle("on", screen === "menu"); sGame.classList.toggle("on", screen === "game"); }
+
+  function startLevel(i) { mode = "level"; cur = i; cfg = LEVELS[i]; show("game"); reset(); }
+  function startClassic(n) { mode = "classic"; cfg = { id: 0, w: n, h: n, target: CLASSIC_TARGET, blocks: [], maxMoves: null }; show("game"); reset(); }
+
+  function reset() {
+    cells = L.newGame(cfg.w, cfg.h, cfg.blocks);
+    score = 0; moves = 0; undos = UNDOS; history = []; won = false; over = false; keepGoing = false;
+    overlay.classList.remove("on");
+    if (!initGL()) { updateHud(); return; }
+    buildBoard(); resize(); syncTiles(); updateHud();
+    saveGame();
+  }
+  function resume() {
+    const g = progress.game;
+    if (!validGame(g)) { progress.game = null; buildMenu(); return; }
+    mode = g.mode; cur = g.cur || 0;
+    cfg = mode === "level" ? LEVELS[cur] : { id: 0, w: g.size, h: g.size, target: CLASSIC_TARGET, blocks: [], maxMoves: null };
+    cells = g.cells.slice(); score = g.score; moves = g.moves | 0; undos = Math.max(0, Math.min(9, g.undos | 0));
+    won = !!g.won; keepGoing = !!g.keepGoing || won; over = false; history = [];
+    overlay.classList.remove("on");
+    show("game");
+    if (!initGL()) { updateHud(); return; }
+    buildBoard(); resize(); syncTiles(); updateHud();
+  }
+
+  /* =====================================================================
+   * Presentación 3D (three.js, vendorizado en ../_sdk/three.min.js)
+   * Unidades del mundo: 1 celda = 1. x = columna, z = fila, y = altura.
+   * ===================================================================== */
+  const ELEV = 66, TILE = 0.9, TILE_H = 0.46, SLIDE = 0.11, POP = 0.18, APPEAR = 0.16;
+  const ATLAS_COLS = 5, ATLAS_ROWS = 4, ATLAS_CELL = 256;
+  let renderer = null, scene, camera, hemi, sun, boardGroup, tilesGroup, glOk = null, T = {};
+  let geoTile, geoWell, geoBlock, atlasTex, numGeos = [], bodyMats = [], numMat, matSlab, matWell, matBlock;
+  let tiles = [], dying = [], raf = 0, animEnd = 0, sw = 0, sh = 0;
+  const tmp = new THREE.Vector3();
+
+  // Caja con esquinas redondeadas (sin addons): se deforma una BoxGeometry subdividida
+  function roundedBox(w, h, d, r, seg) {
+    const g = new THREE.BoxGeometry(w, h, d, seg, seg, seg), p = g.attributes.position, n = g.attributes.normal;
+    const hx = w / 2 - r, hy = h / 2 - r, hz = d / 2 - r, v = new THREE.Vector3(), c = new THREE.Vector3();
+    const cl = (x, m) => Math.max(-m, Math.min(m, x));
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i);
+      c.set(cl(v.x, hx), cl(v.y, hy), cl(v.z, hz));
+      v.sub(c);
+      if (v.lengthSq() < 1e-12) continue;
+      v.normalize();
+      n.setXYZ(i, v.x, v.y, v.z);
+      p.setXYZ(i, c.x + v.x * r, c.y + v.y * r, c.z + v.z * r);
+    }
+    return g;
+  }
+
+  const TILE_VARS = ["--t2", "--t4", "--t8", "--t16", "--t32", "--t64", "--t128", "--t256", "--t512", "--t1024", "--t2048", "--tbig"];
+  const tileIdx = (v) => Math.max(0, Math.min(TILE_VARS.length - 1, Math.round(Math.log2(v)) - 1));
+  const atlasIdx = (v) => Math.max(0, Math.min(ATLAS_COLS * ATLAS_ROWS - 1, Math.round(Math.log2(v)) - 1));
+
+  // Un solo atlas con los números 2, 4, 8 … 2^20; cada valor usa una geometría con sus UV
+  function buildAtlas() {
+    const c = document.createElement("canvas");
+    c.width = ATLAS_COLS * ATLAS_CELL; c.height = ATLAS_ROWS * ATLAS_CELL;
+    const x = c.getContext("2d");
+    x.textAlign = "center"; x.textBaseline = "middle";
+    for (let k = 0; k < ATLAS_COLS * ATLAS_ROWS; k++) {
+      const v = Math.pow(2, k + 1), s = String(v), d = s.length;
+      const col = k % ATLAS_COLS, row = Math.floor(k / ATLAS_COLS);
+      const px = (d <= 2 ? 0.62 : d === 3 ? 0.5 : d === 4 ? 0.41 : d === 5 ? 0.34 : d === 6 ? 0.29 : 0.25) * ATLAS_CELL;
+      x.font = "bold " + Math.round(px) + "px Arial,Helvetica,sans-serif";
+      x.fillStyle = v <= 32 ? (T.tdark || "#2a4a3e") : "#ffffff";
+      x.fillText(s, (col + 0.5) * ATLAS_CELL, (row + 0.5) * ATLAS_CELL + ATLAS_CELL * 0.04);
+    }
+    return c;
+  }
+  function numGeo(k) {
+    const g = new THREE.PlaneGeometry(TILE * 0.86, TILE * 0.86), uv = g.attributes.uv;
+    const col = k % ATLAS_COLS, row = Math.floor(k / ATLAS_COLS), u0 = col / ATLAS_COLS, u1 = (col + 1) / ATLAS_COLS;
+    const v1 = 1 - row / ATLAS_ROWS, v0 = 1 - (row + 1) / ATLAS_ROWS;
+    uv.setXY(0, u0, v1); uv.setXY(1, u1, v1); uv.setXY(2, u0, v0); uv.setXY(3, u1, v0);
+    g.rotateX(-Math.PI / 2);
+    return g;
+  }
+
+  function initGL() {
+    if (glOk !== null) return glOk;
+    try {
+      if (!window.THREE) throw new Error("three.js no cargó");
+      renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setClearColor(0x000000, 0);
+      renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(30, 1, 0.5, 300);
+      hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.5); scene.add(hemi);
+      sun = new THREE.DirectionalLight(0xffffff, 0.55);
+      sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0008;
+      scene.add(sun, sun.target);
+      boardGroup = new THREE.Group(); tilesGroup = new THREE.Group(); scene.add(boardGroup, tilesGroup);
+      geoTile = roundedBox(TILE, TILE_H, TILE, 0.15, 6);
+      geoWell = roundedBox(TILE, 0.1, TILE, 0.06, 4);
+      geoBlock = roundedBox(TILE, 0.34, TILE, 0.1, 4);
+      readTheme();
+      atlasTex = new THREE.CanvasTexture(buildAtlas());
+      atlasTex.generateMipmaps = false; atlasTex.minFilter = THREE.LinearFilter; atlasTex.magFilter = THREE.LinearFilter;
+      if (renderer.capabilities.getMaxAnisotropy) atlasTex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+      for (let k = 0; k < ATLAS_COLS * ATLAS_ROWS; k++) numGeos.push(numGeo(k));
+      numMat = new THREE.MeshBasicMaterial({ map: atlasTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      bodyMats = TILE_VARS.map((n, i) => new THREE.MeshStandardMaterial({ color: T.tile[i], roughness: 0.5, metalness: 0.03 }));
+      matSlab = new THREE.MeshStandardMaterial({ color: T.board, roughness: 0.85 });
+      matWell = new THREE.MeshStandardMaterial({ color: T.cellbg, roughness: 0.95 });
+      matBlock = new THREE.MeshStandardMaterial({ color: T.block, roughness: 0.8 });
+      cv.addEventListener("webglcontextlost", (e) => e.preventDefault());
+      cv.addEventListener("webglcontextrestored", () => { atlasTex.needsUpdate = true; draw(); });
+      glOk = true;
+    } catch (err) {
+      glOk = false; $("noGL").style.display = "flex"; cv.style.display = "none";
+      if (window.console) console.warn("[2048] WebGL no disponible:", err);
+    }
+    return glOk;
+  }
+
+  function readTheme() {
+    T = { tdark: cssVar("--tdark") || "#2a4a3e", board: cssVar("--board") || "#d9d2bf", cellbg: cssVar("--cellbg") || "#e9e3d2",
+          block: cssVar("--block") || "#b9b2a0", tile: TILE_VARS.map((n) => cssVar(n) || "#888") };
+    T.dark = new THREE.Color(cssVar("--bg") || "#fff").getHSL({}).l < 0.5;
+  }
+  // Cambio de modo claro/oscuro con el juego abierto: se actualizan los colores y se redibuja una vez
+  function applyTheme() {
+    if (!glOk) return;
+    readTheme();
+    bodyMats.forEach((m, i) => m.color.set(T.tile[i]));
+    matSlab.color.set(T.board); matWell.color.set(T.cellbg); matBlock.color.set(T.block);
+    hemi.intensity = T.dark ? 0.55 : 0.5; sun.intensity = T.dark ? 0.6 : 0.55;
+    draw();
+  }
+  if (window.matchMedia) {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const f = () => applyTheme();
+    if (mq.addEventListener) mq.addEventListener("change", f); else if (mq.addListener) mq.addListener(f);
+  }
+
+  const wx = (i) => i % cfg.w - (cfg.w - 1) / 2, wz = (i) => Math.floor(i / cfg.w) - (cfg.h - 1) / 2;
+
+  // Losa del tablero + casillas (y bloqueos) del modo actual
+  function buildBoard() {
+    while (boardGroup.children.length) {
+      const o = boardGroup.children.pop();
+      if (o.userData.ownGeo) o.geometry.dispose();
+    }
+    const bw = cfg.w + 0.5, bh = cfg.h + 0.5;
+    const slab = new THREE.Mesh(roundedBox(bw, 0.5, bh, 0.22, 8), matSlab);
+    slab.position.y = -0.25; slab.receiveShadow = true; slab.userData.ownGeo = true;
+    boardGroup.add(slab);
+    for (let i = 0; i < cfg.w * cfg.h; i++) {
+      const blocked = cells[i] === -1;
+      const m = new THREE.Mesh(blocked ? geoBlock : geoWell, blocked ? matBlock : matWell);
+      m.position.set(wx(i), blocked ? 0.17 - 0.02 : -0.03, wz(i));
+      m.receiveShadow = true; m.castShadow = blocked;
+      boardGroup.add(m);
+    }
+    const half = Math.max(cfg.w, cfg.h) / 2 + 2;
+    const sc = sun.shadow.camera; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 1; sc.far = 40; sc.updateProjectionMatrix();
+    sun.position.set(-half * 0.5, 12, half * 0.7); sun.target.position.set(0, 0, 0);
+  }
+
+  /* ---------- Fichas ---------- */
+  function makeTile(i, v) {
+    const g = new THREE.Group(), body = new THREE.Mesh(geoTile, bodyMats[tileIdx(v)]), num = new THREE.Mesh(numGeos[atlasIdx(v)], numMat);
+    body.position.y = TILE_H / 2; body.castShadow = true; body.receiveShadow = true;
+    num.position.y = TILE_H + 0.004; num.renderOrder = 2;
+    g.add(body, num);
+    g.position.set(wx(i), 0, wz(i));
+    const t = { g: g, body: body, num: num, v: v, fx: g.position.x, fz: g.position.z, tx: g.position.x, tz: g.position.z, t0: 0, slide: false,
+                grow: 0, growT: 0, mergeV: 0, die: false };
+    tilesGroup.add(g);
+    return t;
+  }
+  function setValue(t, v) {
+    t.v = v; t.body.material = bodyMats[tileIdx(v)]; t.num.geometry = numGeos[atlasIdx(v)];
+  }
+  // Reconstruye las fichas desde `cells` (sin animación)
+  function syncTiles() {
+    finishAnim();
+    tiles.forEach((t) => t && tilesGroup.remove(t.g));
+    tiles = cells.map((v, i) => v > 0 ? makeTile(i, v) : null);
+    draw();
+  }
+
+  const nowS = () => performance.now() / 1000;
+  const easeOut = (x) => 1 - (1 - x) * (1 - x);
+  // Estado de cada ficha en el instante `now` (segundos; Infinity = estado final)
+  function stepTile(t, now) {
+    const e = now - t.t0;
+    let x = t.tx, z = t.tz;
+    if (t.slide) {
+      const k = Math.min(1, e / SLIDE);
+      x = t.fx + (t.tx - t.fx) * easeOut(k); z = t.fz + (t.tz - t.fz) * easeOut(k);
+      if (k >= 1) {
+        t.slide = false;
+        if (t.die) { t.g.visible = false; }
+        else if (t.mergeV) { setValue(t, t.mergeV); t.mergeV = 0; t.grow = 2; t.growT = t.t0 + SLIDE; }
+      }
+    }
+    let s = 1;
+    if (t.grow === 1) { // aparición
+      const k = Math.max(0, Math.min(1, (now - t.growT) / APPEAR));
+      s = k >= 1 ? 1 : easeOut(k) * (1 + 0.12 * Math.sin(k * Math.PI)); if (k >= 1) t.grow = 0;
+    } else if (t.grow === 2) { // "pop" al fusionar
+      const k = Math.max(0, Math.min(1, (now - t.growT) / POP));
+      s = 1 + 0.2 * Math.sin(k * Math.PI); if (k >= 1) t.grow = 0;
+    }
+    t.g.position.set(x, 0, z);
+    t.g.scale.setScalar(Math.max(0.0001, s));
+  }
+  function stepAll(now) { tiles.forEach((t) => t && stepTile(t, now)); dying.forEach((t) => stepTile(t, now)); }
+  function finishAnim() {
+    stepAll(Infinity);
+    dying.forEach((t) => tilesGroup.remove(t.g)); dying = [];
+    animEnd = 0;
+  }
+
+  function animate(res, sp) {
+    finishAnim();
+    const t0 = nowS(), nt = new Array(tiles.length).fill(null);
+    res.trace.forEach((tr) => {
+      const t = tiles[tr.from]; if (!t) return;
+      t.fx = t.g.position.x; t.fz = t.g.position.z; t.tx = wx(tr.to); t.tz = wz(tr.to); t.t0 = t0; t.slide = true;
+      if (tr.merge) { t.die = true; dying.push(t); }
+      else nt[tr.to] = t;
+    });
+    res.trace.forEach((tr) => { if (tr.merge) { const d = nt[tr.to]; if (d) d.mergeV = cells[tr.to]; } });
+    tiles = nt;
+    let end = t0 + SLIDE + POP;
+    if (sp) {
+      const n = makeTile(sp.idx, sp.v); n.grow = 1; n.growT = t0 + SLIDE * 0.7; n.g.scale.setScalar(0.0001);
+      tiles[sp.idx] = n; end = Math.max(end, n.growT + APPEAR);
+    }
+    animEnd = end + 0.02;
+    kick();
+  }
+
+  /* ---------- Cámara: inclinada, encuadra el tablero completo en cualquier pantalla ---------- */
+  function resize() {
+    if (!glOk || !cfg) return;
+    const wrap = $("boardWrap"), W = Math.max(150, wrap.clientWidth), H = Math.max(150, wrap.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    const el = ELEV * Math.PI / 180, hw = cfg.w / 2 + 0.35, hh = cfg.h / 2 + 0.35;
+    const corners = [[-hw, 0, -hh], [hw, 0, -hh], [-hw, 0, hh], [hw, 0, hh], [-hw, 0.8, -hh], [hw, 0.8, -hh], [-hw, -0.5, hh], [hw, -0.5, hh]];
+    let lo = 2, hi = 250;
+    for (let k = 0; k < 28; k++) {
+      const D = (lo + hi) / 2;
+      camera.position.set(0, D * Math.sin(el), D * Math.cos(el)); camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      const fits = corners.every((c) => { tmp.set(c[0], c[1], c[2]).project(camera); return Math.abs(tmp.x) <= 0.98 && Math.abs(tmp.y) <= 0.98; });
+      if (fits) hi = D; else lo = D;
+    }
+    camera.position.set(0, hi * Math.sin(el), hi * Math.cos(el)); camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+    draw();
+  }
+  window.addEventListener("resize", () => { if (sGame.classList.contains("on")) resize(); });
+
+  function draw() {
+    if (!glOk || !cfg) return;
+    renderer.render(scene, camera);
+  }
+  // Bucle solo mientras dura la animación
+  function loop() {
+    raf = 0;
+    const now = nowS();
+    stepAll(now);
+    draw();
+    if (now < animEnd) raf = requestAnimationFrame(loop);
+    else finishAnim(), draw();
+  }
+  function kick() { if (!raf) raf = requestAnimationFrame(loop); }
+
+  /* ---------- jugada ---------- */
+  function doMove(dir) {
+    if (!cfg || over || !sGame.classList.contains("on") || overlay.classList.contains("on")) return;
+    const res = L.move(cells, cfg.w, cfg.h, dir);
+    if (!res.moved) return;
+    history.push({ cells: cells.slice(), score: score, moves: moves, won: won });
+    if (history.length > 20) history.shift();
+    cells = res.cells; score += res.score; moves++;
+    const sp = L.spawn(cells);
+    if (glOk) animate(res, sp);
+    if (res.score > 0) Arcade.haptic("light");
+    if (score > (progress.best[bestKey()] || 0)) progress.best[bestKey()] = score;
+    updateHud();
+    checkEnd();
+    saveGame();
+  }
+
+  function checkEnd() {
+    if (!won && L.maxTile(cells) >= cfg.target) {
+      won = true;
+      if (mode === "level") {
+        const st = moves <= cfg.s3 ? 3 : moves <= cfg.s2 ? 2 : 1;
+        if (st > (progress.stars[cur] || 0)) progress.stars[cur] = st;
+        clearGame();
+        Arcade.submitScore("stars", totalStars());
+        setTimeout(() => showWin(st), 450);
+      } else { save(); submitBest(); setTimeout(() => showWin(0), 450); }
+      Arcade.haptic("success");
+      return;
+    }
+    if (!won && cfg.maxMoves && moves >= cfg.maxMoves) { over = true; endLoss("Te quedaste sin movimientos."); return; }
+    if (!L.canMove(cells, cfg.w, cfg.h)) { over = true; endLoss("No quedan movimientos posibles."); }
+  }
+  function endLoss(msg) {
+    Arcade.haptic("error"); clearGame(); submitBest();
+    setTimeout(() => showLose(msg), 450);
+  }
+
+  function updateHud() {
+    $("score").textContent = score;
+    $("best").textContent = Math.max(progress.best[bestKey()] || 0, score);
+    const lim = cfg.maxMoves && !keepGoing;
+    $("moves").textContent = lim ? moves + "/" + cfg.maxMoves : moves;
+    $("goal").innerHTML = (mode === "level" ? "Nivel " + cfg.id + " · " : "Clásico " + cfg.w + "×" + cfg.h + " · ") + "Objetivo: <b>" + cfg.target + "</b>";
+    $("undoCount").textContent = undos;
+    $("undoBtn").disabled = history.length === 0;
+  }
+
+  function undo() {
+    if (!history.length || overlay.classList.contains("on")) return;
+    if (undos <= 0) {
+      Ads.rewarded().then((ok) => { if (ok) { undos += 3; updateHud(); saveGame(); } });
+      return;
+    }
+    const h = history.pop(); undos--;
+    cells = h.cells; score = h.score; moves = h.moves; won = h.won; over = false;
+    syncTiles(); updateHud(); saveGame();
+  }
+
+  /* ---------- ventana de fin ---------- */
+  function btn(txt, fn, primary) {
+    const b = document.createElement("button"); b.textContent = txt; if (primary) b.className = "primary"; b.onclick = fn; return b;
+  }
+  function openOv(title, stars, info, buttons) {
+    $("ovTitle").textContent = title; $("ovStars").textContent = stars; $("ovInfo").textContent = info;
+    const row = $("ovRow"); row.innerHTML = ""; buttons.forEach((b) => row.appendChild(b));
+    overlay.classList.add("on");
+  }
+  function toMenu() { overlay.classList.remove("on"); submitBest(); buildMenu(); show("menu"); }
+  function showWin(st) {
+    const bs = [];
+    bs.push(btn("Menú", toMenu));
+    if (!cfg.maxMoves) bs.push(btn("Continuar", () => { keepGoing = true; overlay.classList.remove("on"); updateHud(); saveGame(); }));
+    if (mode === "level") {
+      if (cur + 1 < LEVELS.length) bs.push(btn("Siguiente", () => { Ads.interstitial(); startLevel(cur + 1); }, true));
+    } else bs.push(btn("Nueva", reset, true));
+    openOv("¡Objetivo " + cfg.target + "!", st ? "★".repeat(st) + "☆".repeat(3 - st) : "", "Puntos: " + score + " · Movimientos: " + moves, bs);
+  }
+  function showLose(msg) {
+    openOv("Fin de la partida", "", msg + " Puntos: " + score, [btn("Menú", toMenu), btn("Deshacer", () => { overlay.classList.remove("on"); over = false; undo(); }), btn("Reintentar", reset, true)]);
+  }
+
+  /* ---------- entrada: gesto de deslizar sobre el canvas ---------- */
+  let sx = 0, sy = 0, tracking = false;
+  cv.addEventListener("pointerdown", (e) => { sx = e.clientX; sy = e.clientY; tracking = true; try { cv.setPointerCapture(e.pointerId); } catch (_) {} });
+  cv.addEventListener("pointermove", (e) => {
+    if (!tracking) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    tracking = false;
+    doMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0));
+  });
+  const endTrack = () => { tracking = false; };
+  cv.addEventListener("pointerup", endTrack); cv.addEventListener("pointercancel", endTrack);
+
+  const KEYS = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3, w: 0, d: 1, s: 2, a: 3, W: 0, D: 1, S: 2, A: 3 };
+  window.addEventListener("keydown", (e) => {
+    if (e.key in KEYS) { e.preventDefault(); doMove(KEYS[e.key]); }
+    else if ((e.key === "z" || e.key === "Z" || e.key === "u") && sGame.classList.contains("on")) undo();
+  });
+
+  $("menuBtn").onclick = toMenu;
+  $("undoBtn").onclick = undo;
+  $("restartBtn").onclick = reset;
+  $("resumeBtn").onclick = resume;
+  Arcade.on("pause", () => { if (cfg && mode === "classic") submitBest(); });
+
+  Arcade.ready().then(function (session) {
+    const s = session.state;
+    if (s && typeof s === "object") {
+      progress.stars = (s.stars && typeof s.stars === "object") ? s.stars : {};
+      progress.best = (s.best && typeof s.best === "object") ? s.best : {};
+      progress.game = validGame(s.game) ? s.game : null;
+    }
+    buildMenu();
+  });
+
+  // Gancho de pruebas
+  window.__game = {
+    get cells() { return cells; }, get score() { return score; }, get moves() { return moves; }, get progress() { return progress; },
+    move: doMove, startLevel: startLevel, startClassic: startClassic, resume: resume,
+    setCells: function (c) { cells = c.slice(); syncTiles(); updateHud(); },
+    get glOk() { return glOk; }
+  };
+})();
+</script>
+</body>
+</html>

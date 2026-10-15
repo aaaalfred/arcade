@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Palabras en Rueda</title>
+<style>
+  :root {
+    --bg:#fdfaf2; --ink:#2e473f; --panel:#ffffff; --line:#e6dfcf; --muted:#7d877f; --text:#26332d;
+    --star:#f4a320; --star-off:#ddd6c4; --green:#3f8a52; --red:#d9534f; --cell:#fff; --cellok:#3f8a52; --cellink:#fff; --wheel:#efe8d6; --trace:#3f8a52;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec;
+      --star-off:#3a4a43; --green:#5fcf85; --red:#ff7a72; --cell:#24352f; --cellok:#5fcf85; --cellink:#10201a; --wheel:#243730; --trace:#5fcf85;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#14201c; --ink:#cfe3d8; --panel:#1f2e29; --line:#33463e; --muted:#8fa299; --text:#e8f1ec;
+    --star-off:#3a4a43; --green:#5fcf85; --red:#ff7a72; --cell:#24352f; --cellok:#5fcf85; --cellink:#10201a; --wheel:#243730; --trace:#5fcf85;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:Arial,Helvetica,sans-serif; overscroll-behavior:none; touch-action:manipulation; }
+  #app { max-width:520px; margin:0 auto; height:100%; display:flex; flex-direction:column; padding:10px 16px 12px; }
+  .screen { display:none; flex:1; flex-direction:column; min-height:0; }
+  .screen.on { display:flex; }
+  button { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; cursor:pointer; }
+  button:active { transform:scale(.96); }
+  button.primary { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:bold; }
+  button:disabled { opacity:.4; }
+
+  h1 { font-size:22px; margin:14px 0 6px; text-align:center; color:var(--ink); }
+  .intro { text-align:center; color:var(--muted); margin:0 0 12px; line-height:1.4; font-size:14px; }
+  .coins { text-align:center; color:var(--ink); font-weight:bold; margin-bottom:10px; }
+  .pack { margin:14px 0 8px; color:var(--ink); font-weight:bold; font-size:14px; }
+  .grid5 { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  .grid5 button { padding:12px 0; font-size:18px; min-height:56px; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .grid5 button small { font-size:12px; color:var(--star); letter-spacing:1px; min-height:14px; }
+  .grid5 button.locked { opacity:.35; }
+
+  .top { display:flex; align-items:center; justify-content:space-between; min-height:44px; gap:8px; }
+  #menuBtn { min-width:44px; min-height:44px; padding:6px 10px; font-size:18px; }
+  .chip { font-size:14px; color:var(--ink); font-weight:bold; }
+  #lvTitle { color:var(--muted); font-size:13px; text-align:center; }
+
+  /* escenario 3D: un solo canvas detrás de la zona del crucigrama y la rueda */
+  #stage { flex:1; position:relative; min-height:0; display:flex; flex-direction:column; }
+  #cv { position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none; }
+  #noGL { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--muted); }
+  #board { flex:1; min-height:0; position:relative; }
+  #preview { height:36px; display:flex; align-items:center; justify-content:center; position:relative; pointer-events:none; }
+  #preview span { background:var(--ink); color:var(--bg); border-radius:18px; padding:4px 16px; font-weight:bold; font-size:20px; letter-spacing:3px; text-transform:uppercase; }
+  #preview span:empty { display:none; }
+  #msg { text-align:center; color:var(--muted); font-size:13px; min-height:18px; position:relative; pointer-events:none; }
+  #msg.good { color:var(--green); font-weight:bold; }
+  #msg.bad { color:var(--red); }
+  #wheelWrap { align-self:center; position:relative; width:min(100%, 34vh, 290px); aspect-ratio:1/1; touch-action:none; margin:2px 0; }
+  .tools { display:flex; justify-content:space-between; align-items:center; padding-top:6px; gap:6px; }
+  .tools button { display:flex; flex-direction:column; align-items:center; font-size:12px; gap:2px; padding:8px 10px; min-width:76px; min-height:52px; }
+  .tools button b { font-size:15px; }
+
+  #overlay { position:fixed; inset:0; background:rgba(20,32,28,.55); display:none; align-items:center; justify-content:center; padding:24px; }
+  #overlay.on { display:flex; }
+  .card { background:var(--panel); border-radius:18px; padding:22px; width:100%; max-width:340px; text-align:center; border:1px solid var(--line); }
+  .card h2 { margin:0 0 6px; color:var(--ink); }
+  .big-stars { font-size:36px; color:var(--star); letter-spacing:4px; margin:8px 0; }
+  .card .row { display:flex; gap:8px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+  .card .row button { min-height:44px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <section id="sMenu" class="screen on">
+    <h1>Palabras en Rueda</h1>
+    <p class="intro">Desliza el dedo por las letras para formar palabras<br>y rellenar el crucigrama. Las palabras extra dan monedas.</p>
+    <div class="coins">Monedas: <span id="menuCoins">0</span></div>
+    <div id="packs"></div>
+  </section>
+
+  <section id="sGame" class="screen">
+    <div class="top">
+      <button id="menuBtn" aria-label="Niveles">☰</button>
+      <div><div class="chip">Nivel <span id="lvNum">1</span></div><div id="lvTitle"></div></div>
+      <div style="text-align:right"><div class="chip"><span style="color:var(--star)">●</span> <span id="coins">0</span></div><div class="chip" style="color:var(--muted);font-weight:normal;font-size:12px"><span id="pts">0</span> pts</div></div>
+    </div>
+    <div id="stage">
+      <canvas id="cv"></canvas>
+      <div id="noGL">No se pudo iniciar el modo 3D en este dispositivo.</div>
+      <div id="board"></div>
+      <div id="preview"><span id="pv"></span></div>
+      <div id="msg"></div>
+      <div id="wheelWrap"></div>
+    </div>
+    <div class="tools">
+      <button id="shuffleBtn" aria-label="Barajar"><span style="font-size:18px">⇄</span><span>Barajar</span></button>
+      <button id="extrasBtn" aria-label="Extras"><span style="font-size:18px;color:var(--star)">★</span><span>Extras <b id="exCount">0/0</b></span></button>
+      <button id="hintBtn" aria-label="Pista"><span style="font-size:18px;color:var(--star)">✦</span><span>Pista <b>25</b></span></button>
+      <button id="adBtn" aria-label="Ver anuncio"><span style="font-size:18px">▶</span><span>+50 monedas</span></button>
+    </div>
+  </section>
+</div>
+
+<div id="overlay"><div class="card">
+  <h2 id="ovTitle">¡Nivel completo!</h2>
+  <div class="big-stars" id="ovStars"></div>
+  <div id="ovInfo" style="color:var(--muted);line-height:1.5"></div>
+  <div class="row">
+    <button id="bMenu">Niveles</button>
+    <button id="bRetry">Repetir</button>
+    <button id="bNext" class="primary">Siguiente</button>
+  </div>
+</div></div>
+
+<script src="../_sdk/arcade-sdk.js" data-game="wordscapes"></script>
+<script src="../_sdk/three.min.js"></script>
+<script src="logic.js"></script>
+<script src="levels.js"></script>
+<script>
+(function () {
+  "use strict";
+  const L = window.Logic, LEVELS = window.LEVELS_DATA;
+  const HINT_COST = 25, BONUS_COINS = 5, LEVEL_COINS = 20, AD_COINS = 50;
+  const PACKS = [{ name: "Paquete Bosque", from: 0, to: 5 }, { name: "Paquete Mar", from: 5, to: 10 }];
+
+  /* Anuncios: los gestiona la app (frecuencia, consentimiento, AdMob). El juego solo los pide. */
+  const Ads = {
+    interstitial: function () { return Arcade.ads.interstitial(); },
+    rewarded: function () { return Arcade.ads.rewarded(); }
+  };
+
+  /* ---------- Progreso guardado (lo persiste y sincroniza la app mediante el SDK) ---------- */
+  let progress = { coins: 50, stars: {}, completed: 0, points: 0 };
+  const totalStars = () => Object.keys(progress.stars).reduce((n, k) => n + (progress.stars[k] || 0), 0);
+  function save() { Arcade.save(progress, { progress: { value: Math.min(progress.completed, LEVELS.length), total: LEVELS.length } }); }
+  function loadState(s) {   // el estado puede venir de otro dispositivo: se valida su forma
+    if (!s || typeof s !== "object") return;
+    const num = (v, d) => (typeof v === "number" && isFinite(v) && v >= 0 ? Math.floor(v) : d);
+    const stars = {};
+    if (s.stars && typeof s.stars === "object") Object.keys(s.stars).forEach((k) => { const v = num(s.stars[k], 0); if (v >= 1 && v <= 3) stars[k] = v; });
+    progress = { coins: num(s.coins, 50), stars: stars, completed: Math.min(num(s.completed, 0), LEVELS.length), points: num(s.points, 0) };
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const show = (id) => { document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("on", s.id === id)); };
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const cv = $("cv"), stage = $("stage");
+
+  /* ---------- Menú ---------- */
+  function buildMenu() {
+    $("menuCoins").textContent = progress.coins;
+    const host = $("packs"); host.innerHTML = "";
+    PACKS.forEach((pk) => {
+      const h = document.createElement("div"); h.className = "pack"; h.textContent = pk.name; host.appendChild(h);
+      const g = document.createElement("div"); g.className = "grid5"; host.appendChild(g);
+      for (let i = pk.from; i < pk.to; i++) {
+        const b = document.createElement("button"), st = progress.stars[i + 1] || 0, locked = i > progress.completed;
+        b.innerHTML = (i + 1) + "<small>" + (st ? "★".repeat(st) + "☆".repeat(3 - st) : "") + "</small>";
+        if (locked) { b.classList.add("locked"); b.disabled = true; }
+        b.onclick = () => startLevel(i);
+        g.appendChild(b);
+      }
+    });
+  }
+
+  /* =====================================================================
+   * Presentación 3D (three.js vendorizado en ../_sdk/three.min.js)
+   * Un solo canvas con dos vistas (scissor): el crucigrama de losetas arriba y la rueda de letras abajo.
+   * Crucigrama: 1 celda = 1 unidad (x = columna, z = fila, y = altura). Rueda: disco de radio 1.5.
+   * ===================================================================== */
+  const WR = 1.5, RING = 1.02, TOK_Y = 0.22, HIT = 0.4;
+  let renderer = null, glOk = null, sceneB, sceneW, camB, camW, boardGroup, tokGroup, traceGroup, discMesh;
+  let hemiB, sunB, hemiW, sunW, T = {}, M = {}, G = {}, atlas = null, raf = 0, last = 0;
+  const rects = { b: null, w: null, W: 0, H: 0 };
+  const letterGeos = {};
+  const planeW = new THREE.Plane(new THREE.Vector3(0, 1, 0), -TOK_Y);
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), hitV = new THREE.Vector3(), v1 = new THREE.Vector3();
+  const UP = new THREE.Vector3(0, 1, 0);
+  const ease = (p) => 1 - Math.pow(1 - p, 3);
+  const clamp01 = (p) => Math.max(0, Math.min(1, p));
+
+  // Atlas de letras generado en código (A-Z), blanco sobre transparente; se tiñe con el color del material
+  function makeAtlas() {
+    const COLS = 8, CELL = 128, c = document.createElement("canvas");
+    c.width = COLS * CELL; c.height = 4 * CELL;
+    const x = c.getContext("2d");
+    x.fillStyle = "#fff"; x.textAlign = "center"; x.textBaseline = "alphabetic";
+    x.font = "bold 92px Arial, Helvetica, sans-serif";
+    for (let i = 0; i < 26; i++) {
+      const ch = String.fromCharCode(65 + i), cx = (i % COLS) * CELL + CELL / 2, cy = Math.floor(i / COLS) * CELL;
+      x.fillText(ch, cx, cy + CELL * 0.74);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter;
+    t.anisotropy = 1;
+    return { tex: t, COLS: COLS, ROWS: 4 };
+  }
+  // plano horizontal (texto legible desde la cámara) con las UV de una letra del atlas
+  function letterGeo(ch) {
+    const i = Math.max(0, Math.min(25, ch.toLowerCase().charCodeAt(0) - 97));
+    if (letterGeos[i]) return letterGeos[i];
+    const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
+    const u0 = (i % atlas.COLS) / atlas.COLS, u1 = u0 + 1 / atlas.COLS;
+    const v1_ = 1 - (Math.floor(i / atlas.COLS) + 1) / atlas.ROWS, v0 = v1_ + 1 / atlas.ROWS;
+    // PlaneGeometry rotada: vértices (-.5,.5)(.5,.5)(-.5,-.5)(.5,-.5) -> uv de arriba-izq. a abajo-der.
+    g.setAttribute("uv", new THREE.Float32BufferAttribute([u0, v0, u1, v0, u0, v1_, u1, v1_], 2));
+    letterGeos[i] = g;
+    return g;
+  }
+
+  function initGL() {
+    if (glOk !== null) return glOk;
+    try {
+      if (!window.THREE) throw new Error("three.js no cargó");
+      renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setClearColor(0x000000, 0); renderer.autoClear = false;
+      renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+      atlas = makeAtlas();
+
+      const mk = (hemi, sun, size) => {
+        const sc = new THREE.Scene();
+        sc.add(hemi); sun.castShadow = true; sun.shadow.mapSize.set(size, size); sun.shadow.bias = -0.0008;
+        sc.add(sun, sun.target); return sc;
+      };
+      hemiB = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.85); sunB = new THREE.DirectionalLight(0xffffff, 0.9);
+      hemiW = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.85); sunW = new THREE.DirectionalLight(0xffffff, 0.9);
+      sceneB = mk(hemiB, sunB, 1024); sceneW = mk(hemiW, sunW, 512);
+      sunW.position.set(-2, 8, 3); sunW.target.position.set(0, 0, 0);
+      const sw = sunW.shadow.camera; sw.left = -2; sw.right = 2; sw.top = 2; sw.bottom = -2; sw.near = 1; sw.far = 20; sw.updateProjectionMatrix();
+
+      camB = new THREE.PerspectiveCamera(30, 1, 0.5, 300);
+      camW = new THREE.PerspectiveCamera(30, 1, 0.5, 100);
+      boardGroup = new THREE.Group(); sceneB.add(boardGroup);
+      tokGroup = new THREE.Group(); traceGroup = new THREE.Group(); sceneW.add(tokGroup, traceGroup);
+
+      // geometrías compartidas
+      G.tile = new THREE.BoxGeometry(0.9, 0.3, 0.9);
+      G.slot = new THREE.BoxGeometry(0.9, 0.06, 0.9);
+      G.tok = new THREE.CylinderGeometry(0.29, 0.31, 0.2, 28);
+      G.cyl = new THREE.CylinderGeometry(1, 1, 1, 10);
+      G.sph = new THREE.SphereGeometry(1, 14, 10);
+      // materiales (los colores se asignan en applyTheme)
+      const std = (r) => new THREE.MeshStandardMaterial({ roughness: r });
+      M.slab = std(0.85); M.rim = std(0.9); M.slot = std(0.9); M.tile = std(0.5); M.hint = std(0.5);
+      M.disc = std(0.8); M.discRim = std(0.9); M.tok = std(0.5); M.tokSel = std(0.4);
+      M.trace = new THREE.MeshStandardMaterial({ roughness: 0.35, transparent: true });
+      const lm = () => new THREE.MeshBasicMaterial({ map: atlas.tex, transparent: true, depthWrite: false });
+      M.lTile = lm(); M.lHint = lm(); M.lTok = lm(); M.lTokSel = lm();
+      [M.lTile, M.lHint, M.lTok, M.lTokSel].forEach((m) => { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; });
+
+      // disco de la rueda (fijo)
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(WR, WR, 0.3, 56), M.disc);
+      disc.position.y = -0.15; disc.receiveShadow = true;
+      const drim = new THREE.Mesh(new THREE.CylinderGeometry(WR + 0.12, WR + 0.12, 0.2, 56), M.discRim);
+      drim.position.y = -0.4; drim.receiveShadow = true;
+      sceneW.add(disc, drim);
+
+      applyTheme();
+      cv.addEventListener("webglcontextlost", (e) => e.preventDefault());
+      cv.addEventListener("webglcontextrestored", () => kick());
+      glOk = true;
+    } catch (err) {
+      glOk = false; $("noGL").style.display = "flex"; cv.style.display = "none";
+      if (window.console) console.warn("[wordscapes] WebGL no disponible:", err);
+    }
+    return glOk;
+  }
+
+  function applyTheme() {
+    if (!glOk && glOk !== null) return;
+    if (!renderer) return;
+    const g = (n, d) => cssVar(n) || d;
+    T = { bg: g("--bg", "#fdfaf2"), ink: g("--ink", "#2e473f"), panel: g("--panel", "#fff"), line: g("--line", "#e6dfcf"),
+          text: g("--text", "#26332d"), star: g("--star", "#f4a320"), red: g("--red", "#d9534f"), cell: g("--cell", "#fff"),
+          cellok: g("--cellok", "#3f8a52"), cellink: g("--cellink", "#fff"), wheel: g("--wheel", "#efe8d6"), trace: g("--trace", "#3f8a52") };
+    T.dark = new THREE.Color(T.bg).getHSL({}).l < 0.5;
+    const C = (c) => new THREE.Color(c);
+    M.slab.color.set(T.panel); M.rim.color.set(T.line);
+    M.slot.color.copy(C(T.cell).lerp(C(T.line), T.dark ? 0.55 : 0.75));
+    M.tile.color.set(T.cellok); M.hint.color.set(T.star);
+    M.disc.color.set(T.wheel); M.discRim.color.copy(C(T.line));
+    M.tok.color.set(T.panel); M.tokSel.color.set(T.trace);
+    M.trace.color.copy(C(T.trace).lerp(C("#ffffff"), 0.2)); M.trace.emissive.copy(C(T.trace)).multiplyScalar(0.25);
+    M.lTile.color.set(T.cellink); M.lHint.color.set("#ffffff"); M.lTok.color.set(T.text); M.lTokSel.color.set(T.cellink);
+    hemiB.intensity = hemiW.intensity = T.dark ? 0.65 : 0.5; sunB.intensity = sunW.intensity = T.dark ? 0.7 : 0.5;
+  }
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => setTimeout(() => { applyTheme(); kick(); }, 0)); } catch (e) {}
+  try { new MutationObserver(() => { applyTheme(); kick(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class", "style"] }); } catch (e) {}
+
+  /* ---------- Cámaras auto-encuadradas ---------- */
+  function fitCam(cam, aspect, elDeg, hw, hh, hy) {
+    cam.aspect = aspect;
+    const el = elDeg * Math.PI / 180;
+    const corners = [[-hw, 0, -hh], [hw, 0, -hh], [-hw, 0, hh], [hw, 0, hh], [-hw, hy, -hh], [hw, hy, -hh]];
+    let lo = 2, hi = 250;
+    for (let k = 0; k < 28; k++) {
+      const D = (lo + hi) / 2;
+      cam.position.set(0, D * Math.sin(el), D * Math.cos(el)); cam.lookAt(0, 0, 0);
+      cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+      const fits = corners.every((c) => { v1.set(c[0], c[1], c[2]).project(cam); return Math.abs(v1.x) <= 0.97 && Math.abs(v1.y) <= 0.97; });
+      if (fits) hi = D; else lo = D;
+    }
+    cam.position.set(0, hi * Math.sin(el), hi * Math.cos(el)); cam.lookAt(0, 0, 0);
+    cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+  }
+  function layout() {
+    if (!glOk || !level) return;
+    const sr = stage.getBoundingClientRect(), br = $("board").getBoundingClientRect(), wr = $("wheelWrap").getBoundingClientRect();
+    if (sr.width < 10 || sr.height < 10) return;
+    rects.W = sr.width; rects.H = sr.height;
+    rects.b = { x: br.left - sr.left, y: br.top - sr.top, w: br.width, h: br.height };
+    rects.w = { x: wr.left - sr.left, y: wr.top - sr.top, w: wr.width, h: wr.height };
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(sr.width, sr.height, false);
+    fitCam(camB, Math.max(0.2, rects.b.w / Math.max(1, rects.b.h)), 64, level.cols / 2 + 0.7, level.rows / 2 + 0.7, 0.6);
+    fitCam(camW, Math.max(0.2, rects.w.w / Math.max(1, rects.w.h)), 60, WR + 0.2, WR + 0.2, 0.5);
+    const half = Math.max(level.cols, level.rows) / 2 + 2;
+    const sc = sunB.shadow.camera; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 1; sc.far = 40; sc.updateProjectionMatrix();
+    sunB.position.set(-half * 0.5, 12, half * 0.8); sunB.target.position.set(0, 0, 0);
+    kick();
+  }
+  window.addEventListener("resize", () => { if ($("sGame").classList.contains("on")) layout(); });
+
+  /* ---------- Crucigrama en losetas ---------- */
+  let cells = {};
+  const cellPos = (r, c) => [c - (level.cols - 1) / 2, r - (level.rows - 1) / 2];
+
+  function disposeGroup(g) {
+    while (g.children.length) {
+      const o = g.children.pop();
+      if (o.userData.ownGeo && o.geometry) o.geometry.dispose();
+    }
+  }
+  function buildBoard() {
+    disposeGroup(boardGroup); cells = {};
+    const bw = level.cols + 0.6, bh = level.rows + 0.6;
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.4, bh), M.slab);
+    slab.position.y = -0.2; slab.receiveShadow = true; slab.userData.ownGeo = true;
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(bw + 0.3, 0.3, bh + 0.3), M.rim);
+    rim.position.y = -0.55; rim.userData.ownGeo = true;
+    boardGroup.add(slab, rim);
+    const used = {};
+    level.words.forEach((w) => L.cellsOf(w).forEach((p) => { used[p[0] + "," + p[1]] = p; }));
+    Object.keys(used).forEach((k) => {
+      const p = used[k], xz = cellPos(p[0], p[1]);
+      const grp = new THREE.Group(); grp.position.set(xz[0], 0, xz[1]);
+      const slot = new THREE.Mesh(G.slot, M.slot); slot.position.y = 0.03; slot.receiveShadow = true;
+      const tile = new THREE.Group(); tile.visible = false;
+      const body = new THREE.Mesh(G.tile, M.tile); body.castShadow = true; body.receiveShadow = true; body.position.y = 0.15;
+      const letter = new THREE.Mesh(letterGeo("a"), M.lTile); letter.position.y = 0.306; letter.scale.setScalar(0.78);
+      tile.add(body, letter); grp.add(slot, tile); boardGroup.add(grp);
+      cells[k] = { r: p[0], c: p[1], grp: grp, tile: tile, body: body, letter: letter, rev: false, t: -1, delay: 0, win: 2, intro: -(p[0] + p[1]) * 0.025 };
+    });
+  }
+  function paintCrossword(newKeys) {
+    const vis = L.revealed(level, st);
+    let n = 0;
+    Object.keys(cells).forEach((k) => {
+      const cl = cells[k], ch = vis[k];
+      if (!ch || cl.rev) return;
+      const hinted = !!st.hinted[k];
+      cl.rev = true; cl.letter.geometry = letterGeo(ch);
+      cl.body.material = hinted ? M.hint : M.tile; cl.letter.material = hinted ? M.lHint : M.lTile;
+      if (newKeys && newKeys.indexOf(k) >= 0) { cl.t = 0; cl.delay = (n++) * 0.08; cl.tile.visible = false; }
+      else { cl.t = 1; cl.tile.visible = true; }
+    });
+    kick();
+  }
+  function updateCells(dt) {
+    let busy = false;
+    for (const k in cells) {
+      const cl = cells[k], g = cl.grp;
+      if (cl.intro < 0.4) {
+        cl.intro += dt; const p = clamp01(cl.intro / 0.4);
+        const s = p <= 0 ? 0.001 : 1 + 1.6 * Math.pow(p - 1, 3) + 0.6 * Math.pow(p - 1, 2);   // easeOutBack
+        g.scale.setScalar(Math.max(0.001, s)); busy = true;
+        if (cl.intro >= 0.4) g.scale.setScalar(1);
+      }
+      if (cl.rev && cl.t < 1) {
+        cl.delay -= dt;
+        if (cl.delay <= 0) { cl.t = Math.min(1, cl.t + dt / 0.6); cl.tile.visible = true; }
+        busy = true;
+        const p = cl.t, tl = cl.tile;
+        if (cl.tile.visible) {
+          tl.position.y = Math.sin(p * Math.PI) * 0.9;
+          tl.rotation.x = (1 - ease(p)) * Math.PI;
+          tl.scale.setScalar(1 + Math.sin(p * Math.PI) * 0.18);
+          if (p >= 1) { tl.position.y = 0; tl.rotation.x = 0; tl.scale.setScalar(1); }
+        }
+      }
+      if (cl.win < 1.01) {
+        cl.win += dt / 0.5; busy = true;
+        const w = cl.win;
+        if (w > 0 && w < 1) cl.tile.position.y = Math.sin(w * Math.PI) * 0.45; else if (w >= 1) cl.tile.position.y = 0;
+      }
+    }
+    return busy;
+  }
+
+  /* ---------- Rueda: fichas con volumen ---------- */
+  let tokens = [];
+  const slotAng = (i, n) => -Math.PI / 2 + i * 2 * Math.PI / n;
+  function buildWheel() {
+    while (tokGroup.children.length) tokGroup.remove(tokGroup.children[tokGroup.children.length - 1]);
+    const n = order.length, sc = n > 6 ? 0.88 : 1;
+    tokens = order.map((ch, i) => {
+      const grp = new THREE.Group();
+      const body = new THREE.Mesh(G.tok, M.tok); body.castShadow = true; body.receiveShadow = true; body.position.y = 0.1;
+      const letter = new THREE.Mesh(letterGeo(ch), M.lTok); letter.position.y = 0.206; letter.scale.setScalar(0.46);
+      grp.add(body, letter); grp.scale.setScalar(sc * 0.01); tokGroup.add(grp);
+      const a = slotAng(i, n);
+      return { ch: ch, grp: grp, body: body, letter: letter, ang: a, angTo: a, y: 0, sc: sc, intro: -i * 0.05, sel: false, x: 0, z: 0 };
+    });
+  }
+  function tokPos(t) { return [RING * Math.cos(t.ang), RING * Math.sin(t.ang)]; }
+  function updateTokens(dt) {
+    let busy = false;
+    const n = tokens.length;
+    tokens.forEach((t, i) => {
+      t.angTo = slotAng(i, n);
+      let d = t.angTo - t.ang; d = Math.atan2(Math.sin(d), Math.cos(d));
+      if (Math.abs(d) > 0.002) { t.ang += d * Math.min(1, dt * 11); busy = true; } else t.ang = t.angTo;
+      const p = tokPos(t); t.x = p[0]; t.z = p[1];
+      const sel = sel_.indexOf(i) >= 0;
+      if (sel !== t.sel) { t.sel = sel; t.body.material = sel ? M.tokSel : M.tok; t.letter.material = sel ? M.lTokSel : M.lTok; }
+      const ty = sel ? 0.1 : 0, dy = ty - t.y;
+      if (Math.abs(dy) > 0.002) { t.y += dy * Math.min(1, dt * 18); busy = true; } else t.y = ty;
+      let s = t.sc * (sel ? 1.1 : 1);
+      if (t.intro < 0.4) {
+        t.intro += dt; busy = true; const q = clamp01(t.intro / 0.4);
+        s *= q <= 0 ? 0.01 : 1 + 1.6 * Math.pow(q - 1, 3) + 0.6 * Math.pow(q - 1, 2);
+      }
+      t.grp.scale.setScalar(Math.max(0.01, s));
+      const hop = Math.abs(d) > 0.05 ? Math.min(0.12, Math.abs(d) * 0.25) : 0;
+      t.grp.position.set(t.x, t.y + hop, t.z);
+    });
+    return busy;
+  }
+
+  /* ---------- Trazo del dedo: tubo 3D (cilindros + esferas compartidos) ---------- */
+  let ghost = null;      // {pts, t, col}
+  const pool = { segs: [], joints: [] };
+  function traceMesh(list, geo) {
+    const m = new THREE.Mesh(geo, M.trace); m.castShadow = false; traceGroup.add(m); list.push(m); return m;
+  }
+  function setTrace(pts) {
+    const R = 0.065, Y = 0.13;   // por debajo de la cara de las fichas: el trazo no tapa las letras
+    while (pool.joints.length < pts.length) traceMesh(pool.joints, G.sph);
+    while (pool.segs.length < Math.max(0, pts.length - 1)) traceMesh(pool.segs, G.cyl);
+    pool.joints.forEach((m, i) => { m.visible = i < pts.length; if (m.visible) { m.scale.setScalar(R); m.position.set(pts[i][0], Y, pts[i][1]); } });
+    pool.segs.forEach((m, i) => {
+      m.visible = i < pts.length - 1; if (!m.visible) return;
+      const a = pts[i], b = pts[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], d = Math.hypot(dx, dz);
+      if (d < 1e-4) { m.visible = false; return; }
+      m.scale.set(R, d, R); m.position.set((a[0] + b[0]) / 2, Y, (a[1] + b[1]) / 2);
+      m.quaternion.setFromUnitVectors(UP, v1.set(dx / d, 0, dz / d));
+    });
+  }
+  function currentTrace() {
+    const pts = sel_.map((i) => [tokens[i].x, tokens[i].z]);
+    if (dragging && ptrW && pts.length) pts.push([ptrW.x, ptrW.z]);
+    return pts;
+  }
+
+  /* ---------- Bucle: solo corre mientras hay animación ---------- */
+  function draw() {
+    if (!glOk || !level || !rects.b) return;
+    const W = rects.W, H = rects.H;
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, W, H); renderer.clear();
+    renderer.setScissorTest(true);
+    const vp = (r) => { const y = H - r.y - r.h; renderer.setViewport(r.x, y, r.w, r.h); renderer.setScissor(r.x, y, r.w, r.h); };
+    vp(rects.b); renderer.render(sceneB, camB);
+    renderer.clearDepth();
+    vp(rects.w); renderer.render(sceneW, camW);
+  }
+  function loop(now) {
+    raf = 0;
+    const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+    let busy = updateCells(dt);
+    if (updateTokens(dt)) busy = true;
+    if (ghost) {
+      ghost.t += dt;
+      if (ghost.t >= 0.4) { ghost = null; setTrace([]); M.trace.opacity = 1; } else { M.trace.opacity = 1 - ghost.t / 0.4; busy = true; }
+    } else setTrace(currentTrace());
+    draw();
+    if (busy) raf = requestAnimationFrame(loop); else last = 0;
+  }
+  function kick() { if (!raf && glOk && !paused) raf = requestAnimationFrame(loop); }
+  let paused = false;
+  Arcade.on("pause", () => { paused = true; if (raf) { cancelAnimationFrame(raf); raf = 0; } });
+  Arcade.on("resume", () => { paused = false; last = 0; kick(); });
+
+  /* ---------- Juego ---------- */
+  let idx = 0, level = null, st = null, order = [], sel_ = [], dragging = false, ptrW = null, wins = 0;
+
+  function startLevel(i) {
+    idx = i; level = LEVELS[i]; st = L.newState(); sel_ = []; order = level.letters.split("");
+    $("lvNum").textContent = level.id;
+    $("lvTitle").textContent = level.letters.length + " letras";
+    $("overlay").classList.remove("on");
+    show("sGame"); say(""); $("pv").textContent = "";
+    if (!initGL()) { updateHud(); return; }
+    ghost = null; setTrace([]); M.trace.opacity = 1;
+    applyTheme(); buildBoard(); buildWheel(); updateHud();
+    layout();
+    kick();
+  }
+
+  function updateHud() {
+    $("coins").textContent = progress.coins; $("pts").textContent = L.points(level, st);
+    $("exCount").textContent = st.bonus.length + "/" + level.bonus.length;
+    $("hintBtn").disabled = L.hiddenCells(level, st).length === 0;
+  }
+  let msgT = 0;
+  function say(t, cls) { const m = $("msg"); m.textContent = t; m.className = cls || ""; clearTimeout(msgT); if (t) msgT = setTimeout(() => say(""), 2200); }
+
+  /* ---------- Entrada: el toque se proyecta sobre el plano de las fichas ---------- */
+  const wrap = $("wheelWrap");
+  function worldOf(e) {
+    const r = wrap.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camW);
+    return ray.ray.intersectPlane(planeW, hitV) ? { x: hitV.x, z: hitV.z } : null;
+  }
+  function hitToken(p) {
+    let best = -1, bd = HIT;
+    tokens.forEach((t, i) => { const d = Math.hypot(p.x - t.x, p.z - t.z); if (d <= bd) { bd = d; best = i; } });
+    return best;
+  }
+  function preview() { $("pv").textContent = sel_.map((i) => tokens[i].ch).join(""); }
+  wrap.addEventListener("pointerdown", (e) => {
+    if (!glOk || !level || $("overlay").classList.contains("on")) return;
+    e.preventDefault(); try { wrap.setPointerCapture(e.pointerId); } catch (x) {}
+    const p = worldOf(e); if (!p) return;
+    ptrW = p; const h = hitToken(p);
+    if (h >= 0) { dragging = true; ghost = null; M.trace.opacity = 1; sel_ = [h]; preview(); Arcade.haptic("light"); }
+    kick();
+  });
+  wrap.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    e.preventDefault(); const p = worldOf(e); if (!p) return;
+    ptrW = p; const h = hitToken(p);
+    if (h >= 0) {
+      if (sel_.length > 1 && h === sel_[sel_.length - 2]) { sel_.pop(); preview(); }          // retroceder
+      else if (sel_.indexOf(h) < 0) { sel_.push(h); preview(); Arcade.haptic("light"); }
+    }
+    kick();
+  });
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    const pts = sel_.map((i) => [tokens[i].x, tokens[i].z]);
+    const word = sel_.map((i) => tokens[i].ch).join("");
+    sel_ = []; ptrW = null; $("pv").textContent = "";
+    const res = word.length ? onWord(word) : null;
+    if (pts.length > 1) {
+      ghost = { t: 0 };
+      M.trace.color.set(res === "ok" ? T.trace : res === "bad" ? T.red : T.trace).lerp(new THREE.Color("#ffffff"), 0.2);
+      setTrace(pts);
+    } else { setTrace([]); }
+    kick();
+  }
+  wrap.addEventListener("pointerup", endDrag);
+  wrap.addEventListener("pointercancel", () => { dragging = false; ptrW = null; sel_ = []; preview(); kick(); });
+
+  function onWord(word) {
+    const had = Object.keys(L.revealed(level, st)), res = L.submit(level, st, word);
+    let kind = "bad";
+    if (res.type === "grid") {
+      const now = Object.keys(L.revealed(level, st)).filter((k) => had.indexOf(k) < 0);
+      paintCrossword(now); say("¡Bien! +" + res.word.length * 10 + " pts", "good"); Arcade.haptic("medium"); kind = "ok";
+    } else if (res.type === "bonus") { progress.coins += BONUS_COINS; save(); say("Palabra extra: +" + BONUS_COINS + " monedas", "good"); Arcade.haptic("medium"); kind = "ok"; }
+    else if (res.type === "dup") { say("Ya la tenías", "bad"); Arcade.haptic("error"); }
+    else if (res.type === "short") { say("Mínimo 3 letras", "bad"); }
+    else { say("No está en este nivel", "bad"); Arcade.haptic("error"); }
+    updateHud(); checkWin();
+    return kind;
+  }
+
+  function shuffle() {
+    if (!level || !glOk) return;
+    let o; do { o = tokens.slice().sort(() => Math.random() - 0.5); } while (tokens.length > 2 && o.map((t) => t.ch).join("") === order.join(""));
+    tokens = o; order = o.map((t) => t.ch); sel_ = []; $("pv").textContent = "";
+    kick();
+  }
+  function hint() {
+    if (progress.coins < HINT_COST) { say("Faltan monedas: mira un anuncio (+" + AD_COINS + ")", "bad"); return; }
+    const had = Object.keys(L.revealed(level, st)), r = L.applyHint(level, st, Math.random());
+    if (!r) return;
+    progress.coins -= HINT_COST; save();
+    // la pista puede completar palabras: se animan todas las celdas nuevas
+    paintCrossword(Object.keys(L.revealed(level, st)).filter((k) => had.indexOf(k) < 0));
+    say("Letra revelada", "good"); updateHud(); checkWin();
+  }
+  function checkWin() {
+    if (!L.isComplete(level, st)) return;
+    const s = L.stars(st), prev = progress.stars[level.id] || 0;
+    if (s > prev) progress.stars[level.id] = s;
+    progress.coins += LEVEL_COINS;
+    const pts = L.points(level, st); progress.points += pts;
+    progress.completed = Math.max(progress.completed, Math.min(LEVELS.length, idx + 1));
+    updateHud();
+    save();
+    Arcade.submitScore("stars", totalStars());
+    Arcade.haptic("success");
+    wins++;
+    setTimeout(() => { let n = 0; Object.keys(cells).forEach((k) => { cells[k].win = -(cells[k].r + cells[k].c) * 0.06; n++; }); kick(); }, 500);
+    setTimeout(async () => {
+      $("ovTitle").textContent = idx === LEVELS.length - 1 ? "¡Has completado todo!" : "¡Nivel completo!";
+      $("ovStars").textContent = "★".repeat(s) + "☆".repeat(3 - s);
+      $("ovInfo").innerHTML = pts + " puntos · +" + LEVEL_COINS + " monedas<br>Extras: " + st.bonus.length + "/" + level.bonus.length + " · Pistas: " + st.hints;
+      $("bNext").style.display = idx + 1 < LEVELS.length ? "" : "none";
+      if (wins % 3 === 0) await Ads.interstitial();   // anuncio cada 3 niveles
+      $("overlay").classList.add("on");
+    }, 1500);
+  }
+  function showExtras() {
+    say(st.bonus.length ? "Extras: " + st.bonus.join(", ") : "Aún no has hallado extras (" + level.bonus.length + " por descubrir)");
+  }
+
+  $("shuffleBtn").onclick = shuffle;
+  $("hintBtn").onclick = hint;
+  $("extrasBtn").onclick = showExtras;
+  $("adBtn").onclick = () => Ads.rewarded().then((ok) => { if (ok) { progress.coins += AD_COINS; save(); if (level) updateHud(); say("+" + AD_COINS + " monedas", "good"); } });
+  $("menuBtn").onclick = () => { buildMenu(); show("sMenu"); };
+  $("bMenu").onclick = () => { $("overlay").classList.remove("on"); buildMenu(); show("sMenu"); };
+  $("bRetry").onclick = () => startLevel(idx);
+  $("bNext").onclick = () => startLevel(idx + 1);
+
+  // ayudas para pruebas automáticas: posición (en pantalla) del centro de cada ficha de la rueda y estado del nivel
+  window.__wheelPoints = () => {
+    const r = wrap.getBoundingClientRect();
+    return tokens.map((t) => {
+      const a = t.angTo; v1.set(RING * Math.cos(a), TOK_Y, RING * Math.sin(a)).project(camW);
+      return { ch: t.ch, x: r.left + (v1.x + 1) / 2 * r.width, y: r.top + (1 - v1.y) / 2 * r.height };
+    });
+  };
+  window.__wordscapes = { level: () => level, state: () => st, progress: () => progress, start: startLevel, webgl: () => glOk };
+
+  Arcade.ready().then(function (session) {
+    loadState(session.state);
+    buildMenu();
+  });
+})();
+</script>
+</body>
+</html>

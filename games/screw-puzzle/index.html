@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Tornillos · 10 niveles</title>
+<style>
+  :root {
+    --bg:#fdfaf2; --ink:#5a3b22; --panel:#ffffff; --line:#e6dfcf; --muted:#8a8070; --text:#2f2a22;
+    --star:#f4a320; --star-off:#ddd6c4; --green:#3f8a52; --red:#d9534f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#1d1812; --ink:#e3c9a6; --panel:#2b241b; --line:#443a2c; --muted:#a39580; --text:#f1e9dc;
+      --star-off:#4a4030; --green:#5fcf85; --red:#ff7a72;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#1d1812; --ink:#e3c9a6; --panel:#2b241b; --line:#443a2c; --muted:#a39580; --text:#f1e9dc;
+    --star-off:#4a4030; --green:#5fcf85; --red:#ff7a72;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:Arial,Helvetica,sans-serif; overscroll-behavior:none; touch-action:manipulation; }
+  #app { max-width:520px; margin:0 auto; height:100%; display:flex; flex-direction:column; padding:10px 16px 14px; }
+  .screen { display:none; flex:1; flex-direction:column; min-height:0; }
+  .screen.on { display:flex; }
+  button { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; min-height:44px; cursor:pointer; }
+  button:active { transform:scale(.96); }
+  button.primary { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:bold; }
+  button:disabled { opacity:.4; }
+
+  /* menú */
+  h1 { font-size:22px; margin:14px 0 6px; text-align:center; color:var(--ink); }
+  .intro { text-align:center; color:var(--muted); margin:0 0 18px; line-height:1.4; font-size:14px; }
+  #grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  #grid button { padding:14px 0; font-size:18px; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  #grid button small { font-size:12px; color:var(--star); letter-spacing:1px; min-height:14px; }
+  #grid button.locked { opacity:.35; }
+
+  /* juego */
+  .top { display:flex; align-items:center; justify-content:space-between; min-height:44px; }
+  .top .side { width:84px; }
+  .top .side:last-child { text-align:right; color:var(--muted); font-size:13px; }
+  #menuBtn { padding:6px 10px; font-size:16px; min-width:44px; }
+  #title { color:var(--ink); font-weight:bold; }
+  #nextRow { display:flex; align-items:center; justify-content:center; gap:6px; min-height:22px; color:var(--muted); font-size:12px; }
+  #nextRow i { display:inline-block; width:26px; height:12px; border-radius:5px; box-shadow:inset 0 -2px 0 rgba(0,0,0,.18); }
+  #boardWrap { flex:1; min-height:0; position:relative; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  #noGL { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--muted); }
+  #msg { text-align:center; color:var(--muted); font-size:13px; min-height:18px; margin:4px 0; }
+  .bottom { display:flex; justify-content:center; gap:18px; padding-top:6px; }
+  .tool { position:relative; width:58px; height:58px; padding:0; border-radius:16px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+  .tool svg { width:28px; height:28px; }
+  .badge { position:absolute; top:-8px; right:-8px; min-width:22px; height:22px; border-radius:11px; background:#5cb82a; color:#fff; font-size:13px; font-weight:bold; display:flex; align-items:center; justify-content:center; padding:0 5px; border:2px solid var(--bg); }
+
+  #overlay { position:fixed; inset:0; background:rgba(30,20,10,.55); display:none; align-items:center; justify-content:center; padding:24px; }
+  #overlay.on { display:flex; }
+  .card { background:var(--panel); border-radius:18px; padding:22px; width:100%; max-width:340px; text-align:center; border:1px solid var(--line); }
+  .card h2 { margin:0 0 6px; color:var(--ink); }
+  .big-stars { font-size:36px; color:var(--star); letter-spacing:4px; margin:8px 0; }
+  .card .row { display:flex; gap:8px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="sMenu" class="screen on">
+    <h1>Tornillos</h1>
+    <p class="intro">Toca un tornillo libre para sacarlo. Va a la caja de su color;<br>si no hay caja, ocupa un hueco de reserva. ¡No la llenes!</p>
+    <div id="grid"></div>
+  </section>
+
+  <section id="sGame" class="screen">
+    <div class="top">
+      <div class="side"><button id="menuBtn" aria-label="Niveles">☰</button></div>
+      <div id="title">Nivel 1</div>
+      <div class="side">Reserva <b id="resInfo">0/3</b></div>
+    </div>
+    <div id="nextRow"><span>Siguen</span><span id="nextChips"></span></div>
+    <div id="boardWrap"><canvas id="cv"></canvas><div id="noGL">No se pudo iniciar el modo 3D en este dispositivo.</div></div>
+    <div id="msg"></div>
+    <div class="bottom">
+      <button id="undoBtn" class="tool" aria-label="Deshacer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+      </button>
+      <button id="restartBtn" class="tool" aria-label="Reiniciar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg>
+      </button>
+      <button id="hintBtn" class="tool" aria-label="Pista">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#3f8a52" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z" fill="#3f8a52" fill-opacity=".85"/></svg>
+        <span class="badge" id="hintCount">3</span>
+      </button>
+    </div>
+  </section>
+</div>
+
+<div id="overlay"><div class="card">
+  <h2 id="ovTitle">¡Nivel completo!</h2>
+  <div class="big-stars" id="ovStars"></div>
+  <div id="ovInfo" style="color:var(--muted)"></div>
+  <div class="row">
+    <button id="bMenu">Niveles</button>
+    <button id="bUndo">Deshacer</button>
+    <button id="bRetry">Repetir</button>
+    <button id="bNext" class="primary">Siguiente</button>
+  </div>
+</div></div>
+
+<script src="../_sdk/arcade-sdk.js" data-game="screw-puzzle"></script>
+<script src="../_sdk/three.min.js"></script>
+<script src="logic.js"></script>
+<script src="levels.js"></script>
+<script>
+(function () {
+  "use strict";
+  const L = window.Logic, LEVELS = window.LEVELS_DATA;
+  const HINTS = 3, CAP = L.BOX_CAP;
+  const PALETTE = ["#e0453a", "#3a7bd5", "#3fa34d", "#f2c230", "#9457d6", "#f08a24"];
+  const WOOD = ["#d9b074", "#c9955c", "#e0b982", "#bd8a58", "#d1a068"];
+
+  /* Anuncios: los gestiona la app (frecuencia, consentimiento, AdMob). El juego solo los pide. */
+  const Ads = {
+    interstitial: function () { return Arcade.ads.interstitial(); },
+    rewarded: function () { return Arcade.ads.rewarded(); }
+  };
+
+  /* ---------- Progreso guardado (lo persiste y sincroniza la app mediante el SDK) ---------- */
+  let progress = { stars: {}, completed: 0 };
+  const levelsDone = () => Object.keys(progress.stars).length;
+  const totalStars = () => Object.keys(progress.stars).reduce(function (n, k) { return n + (progress.stars[k] || 0); }, 0);
+  function save() { Arcade.save(progress, { progress: { value: levelsDone(), total: LEVELS.length } }); }
+
+  const $ = (id) => document.getElementById(id);
+  const sMenu = $("sMenu"), sGame = $("sGame"), cv = $("cv"), overlay = $("overlay");
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  /* ---------- Estado de la partida ---------- */
+  let cur = 0, lv = null, st = null, history = [], hints = HINTS, hintSid = -1, penalty = 0, over = false, raf = 0, paused = false, finishTimer = 0;
+
+  function buildMenu() {
+    const g = $("grid"); g.innerHTML = "";
+    LEVELS.forEach((l, i) => {
+      const unlocked = i === 0 || progress.stars[i - 1] !== undefined;
+      const stars = progress.stars[i] || 0;
+      const b = document.createElement("button");
+      b.innerHTML = (i + 1) + "<small>" + (stars ? "★".repeat(stars) + "☆".repeat(3 - stars) : "") + "</small>";
+      if (!unlocked) { b.className = "locked"; b.disabled = true; }
+      b.onclick = () => startLevel(i);
+      g.appendChild(b);
+    });
+  }
+  function show(screen) { sMenu.classList.toggle("on", screen === "menu"); sGame.classList.toggle("on", screen === "game"); }
+
+  function startLevel(i) {
+    clearTimeout(finishTimer);
+    cur = i; lv = LEVELS[i]; st = L.newState(lv); history = []; hints = HINTS; hintSid = -1; penalty = 0; over = false;
+    overlay.classList.remove("on"); $("msg").textContent = ""; $("title").textContent = "Nivel " + lv.id;
+    show("game"); updateHud();
+    if (!initGL()) return;
+    buildScene();
+    resize();
+  }
+  function updateHud() {
+    $("hintCount").textContent = hints;
+    $("hintBtn").disabled = hints <= 0 || over;
+    $("undoBtn").disabled = !history.length || over;
+    $("resInfo").textContent = st.reserve.length + "/" + st.R;
+    $("nextChips").innerHTML = st.queue.slice(0, 3).map((c) => '<i style="background:' + PALETTE[c] + '"></i>').join(" ");
+  }
+
+  /* =====================================================================
+   * Presentación 3D (three.js, vendorizado en ../_sdk/three.min.js)
+   * Mundo: x = ancho, z = alto del tablero (hacia la cámara = abajo), y = altura.
+   * El tablero lógico de 100x150 se escala por S. Cajas y reserva van al fondo (z negativo).
+   * ===================================================================== */
+  const S = 0.1, wx = (x) => (x - 50) * S, wz = (y) => (y - 75) * S;
+  const T_PLATE = 0.22, BEV = 0.03, GAP = 0.015, SCREW_LIFT = 0.75;
+  const TABLE = { x: 5.9, z0: -12.7, z1: 8.1 }, TC = (TABLE.z0 + TABLE.z1) / 2;
+  const BOX_Z = -11.0, BOX_D = 2.0, RES_Z = -8.7, FLOOR = 0.12, SCREW_Y = FLOOR + 0.28, ELEV = 72;
+
+  let renderer = null, scene, camera, hemi, sun, glOk = null, T = {};
+  let boardGroup, platesGroup, screwsGroup, ghostGroup, hudGroup, hintRing;
+  let geoUnit, geoHole, geoWell, geoGhost, woodTex;
+  const screwGeo = [], screwMat = {}, ghostMat = [], boxMat = [], floorMat = [];
+  let mats = {};                       // materiales del escenario que dependen del tema
+  let pl = [], screwMesh = [], ghosts = [], screwBase = [];
+  let dBoxes = [], leaving = [], dRes = [], flights = [], shake = {}, desync = false;
+  let boxW = 4.4, boxHp = 1.4, resP = 1.5;
+
+  const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3();
+
+  function initGL() {
+    if (glOk !== null) return glOk;
+    try {
+      if (!window.THREE) throw new Error("three.js no cargó");
+      renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setClearColor(0x000000, 0);
+      renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(30, 1, 0.5, 300);
+      hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.85); scene.add(hemi);
+      sun = new THREE.DirectionalLight(0xffffff, 0.9);
+      sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0008;
+      const sc = sun.shadow.camera; sc.left = -9; sc.right = 9; sc.top = 13; sc.bottom = -13; sc.near = 1; sc.far = 50; sc.updateProjectionMatrix();
+      sun.position.set(-5, 15, TC + 5); sun.target.position.set(0, 0, TC);
+      scene.add(sun, sun.target);
+      boardGroup = new THREE.Group(); platesGroup = new THREE.Group(); screwsGroup = new THREE.Group(); ghostGroup = new THREE.Group(); hudGroup = new THREE.Group();
+      scene.add(boardGroup, platesGroup, screwsGroup, ghostGroup, hudGroup);
+
+      geoUnit = new THREE.BoxGeometry(1, 1, 1);
+      geoHole = new THREE.CylinderGeometry(0.38, 0.38, 0.02, 14);
+      geoWell = new THREE.CylinderGeometry(0.5, 0.5, 0.02, 16);
+      geoGhost = new THREE.CircleGeometry(0.42, 16); geoGhost.rotateX(-Math.PI / 2);
+      PALETTE.forEach((hex, c) => {
+        screwGeo[c] = makeScrewGeo(new THREE.Color(hex));
+        ghostMat[c] = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.55, depthWrite: false });
+        boxMat[c] = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.6 });
+        floorMat[c] = new THREE.MeshStandardMaterial({ color: new THREE.Color(hex).multiplyScalar(0.55), roughness: 0.8 });
+      });
+      screwMat.m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.2 });
+      woodTex = makeWoodTexture();
+      mats.holeDark = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38 });
+      mats.ring = new THREE.MeshBasicMaterial({ color: 0x3f8a52, side: THREE.DoubleSide });
+      const rg = new THREE.RingGeometry(0.56, 0.7, 28); rg.rotateX(-Math.PI / 2);
+      hintRing = new THREE.Mesh(rg, mats.ring); hintRing.visible = false; scene.add(hintRing);
+      cv.addEventListener("webglcontextlost", (e) => e.preventDefault());
+      cv.addEventListener("webglcontextrestored", () => draw());
+      glOk = true;
+    } catch (err) {
+      glOk = false; $("noGL").style.display = "flex"; cv.style.display = "none";
+      if (window.console) console.warn("[screw-puzzle] WebGL no disponible:", err);
+    }
+    return glOk;
+  }
+
+  // Tornillo: arandela + cabeza de color con ranura + caña, en una sola malla (colores por vértice).
+  // El origen está en la cara inferior de la arandela; la caña baja por -y.
+  function makeScrewGeo(color) {
+    const parts = [];
+    const add = (g, y, col) => { g.translate(0, y, 0); parts.push([g, col]); };
+    const steel = new THREE.Color(0xb9bec4), steelLt = new THREE.Color(0xdfe3e7), dark = new THREE.Color(0x201912);
+    add(new THREE.CylinderGeometry(0.1, 0.07, 0.4, 8), -0.2, steel);
+    add(new THREE.CylinderGeometry(0.46, 0.46, 0.05, 18), 0.025, steelLt);
+    add(new THREE.CylinderGeometry(0.34, 0.4, 0.17, 18), 0.135, color);
+    add(new THREE.BoxGeometry(0.56, 0.02, 0.1), 0.222, dark);
+    const pos = [], nor = [], col = [];
+    parts.forEach(([g, c]) => {
+      const n = g.index ? g.toNonIndexed() : g, p = n.attributes.position.array, q = n.attributes.normal.array;
+      for (let i = 0; i < p.length; i++) { pos.push(p[i]); nor.push(q[i]); }
+      for (let i = 0; i < p.length / 3; i++) col.push(c.r, c.g, c.b);
+    });
+    const out = new THREE.BufferGeometry();
+    out.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    out.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+    out.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    return out;
+  }
+
+  // Veta de madera procedural (sin recursos externos). Se repite en ambos ejes.
+  function makeWoodTexture() {
+    const N = 256, c = document.createElement("canvas"); c.width = c.height = N;
+    const g = c.getContext("2d");
+    g.fillStyle = "#f4ead8"; g.fillRect(0, 0, N, N);
+    let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let k = 0; k < 46; k++) {
+      const y = rnd() * N, amp = 1 + rnd() * 3, ph = rnd() * 6.28, fr = 1 + Math.floor(rnd() * 2);
+      g.strokeStyle = "rgba(120,80,40," + (0.1 + rnd() * 0.16) + ")"; g.lineWidth = 0.8 + rnd() * 2.2;
+      for (let off = -N; off <= N; off += N) {
+        g.beginPath();
+        for (let x = 0; x <= N; x += 8) { const yy = y + off + Math.sin(x / N * 6.2832 * fr + ph) * amp; x ? g.lineTo(x, yy) : g.moveTo(x, yy); }
+        g.stroke();
+      }
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    if ("colorSpace" in t) t.colorSpace = THREE.SRGBColorSpace; else if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+    return t;
+  }
+
+  function readTheme() {
+    T = { ink: cssVar("--ink") || "#5a3b22", panel: cssVar("--panel") || "#ffffff", line: cssVar("--line") || "#e6dfcf", green: cssVar("--green") || "#3f8a52" };
+    T.dark = new THREE.Color(cssVar("--bg") || "#fff").getHSL({}).l < 0.5;
+  }
+  function applyTheme() {
+    readTheme();
+    const k = T.dark ? 0.78 : 1;
+    if (mats.table) {
+      mats.table.color.set(T.panel); mats.rim.color.set(T.line);
+      mats.rail.color.set(T.line).lerp(new THREE.Color(T.ink), 0.18);
+      mats.well.color.set(T.line).multiplyScalar(0.5);
+      mats.holeDark.opacity = T.dark ? 0.55 : 0.38;
+    }
+    pl.forEach((p) => p.mat.color.set(WOOD[p.wi]).multiplyScalar(k));
+    mats.ring.color.set(T.green);
+  }
+
+  function disposeGroup(g) {
+    while (g.children.length) {
+      const o = g.children.pop();
+      if (o.userData.ownGeo && o.geometry) o.geometry.dispose();
+      if (o.userData.ownMat && o.material) o.material.dispose();
+    }
+  }
+  function own(m) { m.userData = { ownGeo: true, ownMat: true }; return m; }
+
+  /* ---------- Escenario del nivel ---------- */
+  function polysOverlap(a, b) {
+    const inside = (p, poly) => L.pointInPoly(p[0], p[1], poly);
+    if (a.some((p) => inside(p, b)) || b.some((p) => inside(p, a))) return true;
+    const cr = (o, p, q) => (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]);
+    for (let i = 0; i < a.length; i++) for (let j = 0; j < b.length; j++) {
+      const p1 = a[i], p2 = a[(i + 1) % a.length], q1 = b[j], q2 = b[(j + 1) % b.length];
+      if (cr(p1, p2, q1) * cr(p1, p2, q2) < 0 && cr(q1, q2, p1) * cr(q1, q2, p2) < 0) return true;
+    }
+    return false;
+  }
+
+  function buildScene() {
+    readTheme();
+    if (mats.well) mats.well.dispose();
+    [boardGroup, platesGroup, screwsGroup, ghostGroup, hudGroup].forEach(disposeGroup);
+    pl = []; screwMesh = []; ghosts = []; screwBase = []; flights = []; shake = {}; dBoxes = []; leaving = []; dRes = []; desync = false;
+    hintRing.visible = false;
+
+    // mesa
+    mats.table = new THREE.MeshStandardMaterial({ color: T.panel, roughness: 0.85 });
+    mats.rim = new THREE.MeshStandardMaterial({ color: T.line, roughness: 0.9 });
+    mats.rail = new THREE.MeshStandardMaterial({ roughness: 0.85 });
+    mats.well = new THREE.MeshBasicMaterial();
+    const tw = TABLE.x * 2, td = TABLE.z1 - TABLE.z0;
+    const slab = own(new THREE.Mesh(new THREE.BoxGeometry(tw, 0.5, td), mats.table));
+    slab.position.set(0, -0.25, TC); slab.receiveShadow = true;
+    const rim = own(new THREE.Mesh(new THREE.BoxGeometry(tw + 0.35, 0.3, td + 0.35), mats.rim));
+    rim.position.set(0, -0.62, TC);
+    boardGroup.add(slab, rim);
+
+    // reserva: riel con huecos
+    const R = lv.reserve; resP = Math.min(1.55, 10.4 / R);
+    const rail = own(new THREE.Mesh(new THREE.BoxGeometry(R * resP + 0.5, FLOOR, 1.3), mats.rail));
+    rail.position.set(0, FLOOR / 2, RES_Z); rail.receiveShadow = true; rail.castShadow = true;
+    boardGroup.add(rail);
+    for (let i = 0; i < R; i++) { const w = new THREE.Mesh(geoWell, mats.well); w.position.copy(wellPos(i, tmp)); w.position.y = FLOOR + 0.011; boardGroup.add(w); }
+
+    // cajas
+    boxW = Math.min(4.4, (10.8 - 0.45 * (lv.slots - 1)) / lv.slots); boxHp = boxW / 3.2;
+
+    // placas apiladas: el nivel de altura depende de las que tiene debajo
+    const order = lv.plates.map((p, i) => i).sort((a, b) => lv.plates[a].layer - lv.plates[b].layer);
+    const lvl = [];
+    order.forEach((i) => {
+      let h = 1;
+      order.forEach((j) => { if (lvl[j] && lv.plates[j].layer < lv.plates[i].layer && polysOverlap(lv.plates[i].pts, lv.plates[j].pts)) h = Math.max(h, lvl[j] + 1); });
+      lvl[i] = h;
+    });
+    lv.plates.forEach((p, i) => {
+      const cx = wx(p.pts.reduce((a, q) => a + q[0], 0) / p.pts.length), cz = wz(p.pts.reduce((a, q) => a + q[1], 0) / p.pts.length);
+      const shape = new THREE.Shape();
+      p.pts.forEach((q, k) => { const X = wx(q[0]) - cx, Y = -(wz(q[1]) - cz); if (k) shape.lineTo(X, Y); else shape.moveTo(X, Y); });
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: T_PLATE - 2 * BEV, bevelEnabled: true, bevelThickness: BEV, bevelSize: BEV, bevelSegments: 1, steps: 1 });
+      geo.rotateX(-Math.PI / 2);
+      // vetas alineadas con el lado mayor de la placa
+      const dx = p.pts[1][0] - p.pts[0][0], dy = p.pts[1][1] - p.pts[0][1], A = Math.atan2(-dy, dx), ca = Math.cos(A), sa = Math.sin(A);
+      const uv = geo.attributes.uv, ox = (i * 0.37) % 1, oy = (i * 0.61) % 1;
+      for (let k = 0; k < uv.count; k++) { const u = uv.getX(k), v = uv.getY(k); uv.setXY(k, (u * ca + v * sa) / 3.2 + ox, (-u * sa + v * ca) / 3.2 + oy); }
+      const wi = i % WOOD.length;
+      const mat = new THREE.MeshStandardMaterial({ map: woodTex, color: WOOD[wi], roughness: 0.82 });
+      const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = true; mesh.receiveShadow = true;
+      const y0 = (lvl[i] - 1) * (T_PLATE + GAP);
+      mesh.position.set(cx, y0 + BEV, cz);
+      mesh.userData = { ownGeo: true, ownMat: true };
+      platesGroup.add(mesh);
+      pl[i] = { mesh, mat, wi, y: y0 + BEV, top: y0 + T_PLATE, fall: null, cx, cz };
+    });
+
+    // tornillos del tablero
+    lv.screws.forEach((s, i) => {
+      const m = new THREE.Mesh(screwGeo[s.c], screwMat.m); m.castShadow = true;
+      screwBase[i] = new THREE.Vector3(wx(s.x), pl[s.p].top, wz(s.y));
+      m.rotation.y = (i * 2.399) % 6.283;
+      screwMesh[i] = m; screwsGroup.add(m);
+    });
+    applyTheme();
+    resetBoard(); rebuildHud();
+  }
+
+  // Deja el tablero según el estado lógico `st` (también sirve para deshacer)
+  function resetBoard() {
+    flights = []; shake = {};
+    pl.forEach((p, i) => {
+      p.fall = null; p.mat.transparent = false; p.mat.opacity = 1;
+      p.mesh.position.set(p.cx, p.y, p.cz); p.mesh.rotation.set(0, 0, 0); p.mesh.scale.setScalar(1);
+      p.mesh.visible = st.plateLeft[i] > 0;
+    });
+    lv.screws.forEach((s, i) => {
+      const m = screwMesh[i];
+      if (st.removed[i]) { m.visible = false; return; }
+      m.visible = true; m.position.copy(screwBase[i]); m.scale.setScalar(1); m.rotation.y = (i * 2.399) % 6.283;
+      screwsGroup.add(m);
+    });
+    refreshGhosts(); updateHintRing();
+  }
+
+  // Silueta tenue de los tornillos tapados, sobre la placa que los cubre
+  function refreshGhosts() {
+    lv.screws.forEach((s, i) => {
+      const g = ghosts[i];
+      if (st.removed[i] || !L.covered(lv, st, i)) { if (g) g.visible = false; return; }
+      let top = 0;
+      lv.plates.forEach((p, j) => { if (st.plateLeft[j] > 0 && p.layer > lv.plates[s.p].layer && L.pointInPoly(s.x, s.y, p.pts)) top = Math.max(top, pl[j].top); });
+      let m = g;
+      if (!m) { m = ghosts[i] = new THREE.Mesh(geoGhost, ghostMat[s.c]); ghostGroup.add(m); m.renderOrder = 2; }
+      m.visible = true; m.position.set(wx(s.x), top + 0.025, wz(s.y));
+    });
+  }
+  function updateHintRing() {
+    if (hintSid >= 0 && !st.removed[hintSid]) { hintRing.visible = true; hintRing.position.copy(screwBase[hintSid]); hintRing.position.y += 0.26; }
+    else hintRing.visible = false;
+  }
+
+  /* ---------- Cajas y reserva ---------- */
+  function wellPos(i, out) { return out.set((i - (lv.reserve - 1) / 2) * resP, SCREW_Y, RES_Z); }
+  const slotX = (i) => (i - (lv.slots - 1) / 2) * (boxW + 0.45);
+  const holeX = (k) => (k - 1) * boxHp;
+
+  function newBox(color, items) {
+    const g = new THREE.Group(), fm = floorMat[color], wm = boxMat[color];
+    const part = (mat, sx, sy, sz, x, y, z) => { const m = new THREE.Mesh(geoUnit, mat); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; g.add(m); };
+    part(fm, boxW, FLOOR, BOX_D, 0, FLOOR / 2, 0);
+    part(wm, boxW, 0.7, 0.16, 0, 0.35, -BOX_D / 2 + 0.08);
+    part(wm, boxW, 0.5, 0.16, 0, 0.25, BOX_D / 2 - 0.08);
+    part(wm, 0.16, 0.7, BOX_D, -boxW / 2 + 0.08, 0.35, 0);
+    part(wm, 0.16, 0.7, BOX_D, boxW / 2 - 0.08, 0.35, 0);
+    for (let k = 0; k < CAP; k++) { const h = new THREE.Mesh(geoHole, mats.holeDark); h.position.set(holeX(k), FLOOR + 0.011, 0); g.add(h); }
+    const b = { color, group: g, items: items || 0, landed: items || 0, tx: 0, wait: 0.12, enter: false };
+    for (let k = 0; k < b.items; k++) { const m = new THREE.Mesh(screwGeo[color], screwMat.m); m.castShadow = true; m.position.set(holeX(k), SCREW_Y, 0); m.rotation.y = k * 1.7; g.add(m); }
+    g.position.set(0, 0, BOX_Z); hudGroup.add(g);
+    return b;
+  }
+  function layoutBoxes(instant) {
+    dBoxes.forEach((b, i) => { b.tx = slotX(i); if (instant) b.group.position.x = b.tx; });
+  }
+
+  function rebuildHud() {
+    flights = [];
+    while (hudGroup.children.length) hudGroup.remove(hudGroup.children[hudGroup.children.length - 1]);
+    dBoxes = []; leaving = []; dRes = []; desync = false;
+    st.boxes.forEach((b) => dBoxes.push(newBox(b.color, b.n)));
+    layoutBoxes(true);
+    st.reserve.forEach((c, i) => {
+      const m = new THREE.Mesh(screwGeo[c], screwMat.m); m.castShadow = true; wellPos(i, m.position); hudGroup.add(m);
+      dRes.push({ color: c, mesh: m, fl: null });
+    });
+  }
+  function hudMatches() {
+    if (dBoxes.length !== st.boxes.length || dRes.length !== st.reserve.length) return false;
+    for (let i = 0; i < dBoxes.length; i++) if (dBoxes[i].color !== st.boxes[i].color || dBoxes[i].items !== st.boxes[i].n) return false;
+    return dRes.every((e, i) => e.color === st.reserve[i]);
+  }
+
+  /* ---------- Cámara: inclinada, encuadra mesa + cajas en cualquier pantalla ---------- */
+  function resize() {
+    if (!lv || !glOk) return;
+    const wrap = $("boardWrap"), W = Math.max(200, wrap.clientWidth), H = Math.max(200, wrap.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    const el = ELEV * Math.PI / 180, hw = TABLE.x + 0.15;
+    const corners = [[-hw, 0, TABLE.z0 - 0.2], [hw, 0, TABLE.z0 - 0.2], [-hw, 0, TABLE.z1 + 0.2], [hw, 0, TABLE.z1 + 0.2], [-hw, 2.6, TABLE.z1], [hw, 2.6, TABLE.z1], [-hw, 1, TABLE.z0], [hw, 1, TABLE.z0]];
+    let lo = 2, hi = 250;
+    for (let k = 0; k < 28; k++) {
+      const D = (lo + hi) / 2;
+      camera.position.set(0, D * Math.sin(el), TC + D * Math.cos(el)); camera.lookAt(0, 0, TC);
+      camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      const fits = corners.every((c) => { tmp.set(c[0], c[1], c[2]).project(camera); return Math.abs(tmp.x) <= 0.97 && Math.abs(tmp.y) <= 0.97; });
+      if (fits) hi = D; else lo = D;
+    }
+    camera.position.set(0, hi * Math.sin(el), TC + hi * Math.cos(el)); camera.lookAt(0, 0, TC);
+    camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+    draw();
+  }
+  window.addEventListener("resize", () => { if (sGame.classList.contains("on")) resize(); });
+  if (window.matchMedia) {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onTheme = () => { if (glOk && lv) { applyTheme(); draw(); } };
+    if (mq.addEventListener) mq.addEventListener("change", onTheme); else if (mq.addListener) mq.addListener(onTheme);
+  }
+
+  // Para pruebas E2E: posición en pantalla (px de página del iframe) de la cabeza de un tornillo
+  window.__screwPuzzleScrewToScreen = function (sid) {
+    const rect = cv.getBoundingClientRect(), b = screwBase[sid];
+    tmp.set(b.x, b.y + 0.2, b.z).project(camera);
+    return [rect.left + (tmp.x + 1) / 2 * rect.width, rect.top + (1 - tmp.y) / 2 * rect.height];
+  };
+
+  function draw() {
+    if (!glOk || !lv) return;
+    renderer.render(scene, camera);
+  }
+
+  /* ---------- Animación ---------- */
+  const ease = (p) => p * p * (3 - 2 * p);
+  const damp = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
+
+  function startFall(pi) { const p = pl[pi]; if (p && p.mesh.visible && !p.fall) { p.fall = { t: 0, r: (pi % 2 ? 1 : -1) * (0.5 + (pi % 3) * 0.2) }; p.mat.transparent = true; } }
+
+  function destOf(tg, out) {
+    if (tg.box) { tg.box.group.updateMatrixWorld(); return tg.box.group.localToWorld(out.set(holeX(tg.k), SCREW_Y, 0)); }
+    const i = Math.max(0, dRes.indexOf(tg.entry));
+    return wellPos(i, out);
+  }
+  function land(fl) {
+    const tg = fl.tg, m = fl.mesh;
+    if (tg.box) { tg.box.group.add(m); m.position.set(holeX(tg.k), SCREW_Y, 0); tg.box.landed++; }
+    else { wellPos(Math.max(0, dRes.indexOf(tg.entry)), m.position); tg.entry.fl = null; }
+    Arcade.haptic("light");
+  }
+  function sendToBox(entry, box, k) {
+    const tg = { box, k };
+    if (entry.fl) { entry.fl.tg = tg; entry.fl.dur = Math.max(entry.fl.dur, 0.35); }
+    else { const fl = { mesh: entry.mesh, phase: 1, t: 0, dur: 0.35, from: entry.mesh.position.clone(), tg, fallen: [] }; flights.push(fl); }
+  }
+
+  function loop(now) {
+    raf = 0;
+    const dt = Math.min(0.05, (now - (loop.t || now)) / 1000); loop.t = now;
+    let busy = false;
+
+    // tornillos en vuelo: giran y salen; luego viajan en arco a su caja o hueco de reserva
+    for (let i = flights.length - 1; i >= 0; i--) {
+      const fl = flights[i], m = fl.mesh;
+      fl.t += dt;
+      if (fl.phase === 0) {
+        const p = Math.min(1, fl.t / 0.24), e = 1 - (1 - p) * (1 - p);
+        m.position.y = fl.y0 + e * SCREW_LIFT; m.rotation.y = fl.r0 + e * Math.PI * 3;
+        if (p >= 1) { fl.phase = 1; fl.t = 0; fl.from.copy(m.position); fl.fallen.forEach(startFall); }
+      } else {
+        const p = Math.min(1, fl.t / fl.dur);
+        destOf(fl.tg, tmp);
+        m.position.lerpVectors(fl.from, tmp, ease(p)); m.position.y += Math.sin(Math.PI * p) * 1.6;
+        m.rotation.y += dt * 9 * (1 - p);
+        if (p >= 1) { flights.splice(i, 1); land(fl); }
+      }
+      busy = true;
+    }
+
+    // placas liberadas: suben, se inclinan y se desvanecen
+    pl.forEach((p) => {
+      if (!p.fall) return;
+      const f = p.fall; f.t += dt;
+      const e = Math.min(1, f.t / 0.55), up = 1 - (1 - e) * (1 - e);
+      p.mesh.position.y = p.y + up * 2.6; p.mesh.rotation.z = f.r * e; p.mesh.rotation.x = -0.3 * e;
+      p.mesh.scale.setScalar(1 + 0.1 * e); p.mat.opacity = 1 - e * e;
+      if (e >= 1) { p.mesh.visible = false; p.fall = null; } else busy = true;
+    });
+
+    // cajas: se acomodan, aparecen y, al llenarse, salen
+    dBoxes.forEach((b) => {
+      const g = b.group;
+      if (Math.abs(g.position.x - b.tx) > 0.003) { g.position.x = damp(g.position.x, b.tx, 9, dt); busy = true; } else g.position.x = b.tx;
+      if (b.enter) {
+        const s = damp(g.scale.x, 1, 12, dt); g.scale.setScalar(s);
+        if (s > 0.995) { g.scale.setScalar(1); b.enter = false; } else busy = true;
+      }
+    });
+    for (let i = leaving.length - 1; i >= 0; i--) {
+      const b = leaving[i], g = b.group;
+      busy = true;
+      if (b.landed < b.items) continue;
+      if ((b.wait -= dt) > 0) continue;
+      g.position.y = damp(g.position.y, 1.6, 9, dt); g.scale.setScalar(Math.max(0, g.scale.x - dt * 3.2));
+      if (g.scale.x <= 0.05) { hudGroup.remove(g); leaving.splice(i, 1); }
+    }
+    // tornillos de la reserva se corren al compactarse
+    dRes.forEach((e, i) => {
+      if (e.fl) return;
+      wellPos(i, tmp);
+      if (e.mesh.position.distanceToSquared(tmp) > 1e-5) { e.mesh.position.x = damp(e.mesh.position.x, tmp.x, 14, dt); e.mesh.position.y = tmp.y; e.mesh.position.z = tmp.z; busy = true; }
+    });
+    // sacudida de un tornillo bloqueado
+    for (const k in shake) {
+      shake[k] = Math.max(0, shake[k] - dt * 3.2);
+      const b = screwBase[k], m = screwMesh[k];
+      if (shake[k] === 0) { delete shake[k]; m.position.x = b.x; } else { m.position.x = b.x + Math.sin(shake[k] * 40) * 0.14 * shake[k]; busy = true; }
+    }
+
+    draw();
+    if (busy) raf = requestAnimationFrame(loop);
+    else if (desync || !hudMatches()) { desync = false; rebuildHud(); draw(); }
+  }
+  function kick() { if (!raf && !paused) { loop.t = 0; raf = requestAnimationFrame(loop); } }
+  if (window.Arcade && Arcade.on) {
+    Arcade.on("pause", function () { paused = true; if (raf) { cancelAnimationFrame(raf); raf = 0; } });
+    Arcade.on("resume", function () { paused = false; if (glOk && lv && sGame.classList.contains("on")) kick(); });
+  }
+
+  /* ---------- Entrada: el tornillo cuya cabeza queda más cerca del toque (con margen táctil ≥ 44 px) ---------- */
+  const ndc = new THREE.Vector3();
+  function pickScrew(cx, cy) {
+    const rect = cv.getBoundingClientRect();
+    const px = (cx - rect.left), py = (cy - rect.top);
+    let best = -1, bd = 1e9;
+    lv.screws.forEach((s, i) => {
+      if (st.removed[i]) return;
+      const b = screwBase[i];
+      ndc.set(b.x, b.y + 0.15, b.z).project(camera);
+      const x = (ndc.x + 1) / 2 * rect.width, y = (1 - ndc.y) / 2 * rect.height;
+      ndc.set(b.x + 0.46, b.y + 0.15, b.z).project(camera);
+      const rpx = Math.abs((ndc.x + 1) / 2 * rect.width - x);
+      const d = Math.hypot(x - px, y - py);
+      const score = d + (L.covered(lv, st, i) ? 8 : 0);
+      if (d < Math.max(22, rpx * 1.3) && score < bd) { bd = score; best = i; }
+    });
+    return best;
+  }
+  cv.addEventListener("pointerdown", (ev) => {
+    if (!glOk || !lv || over || overlay.classList.contains("on")) return;
+    const sid = pickScrew(ev.clientX, ev.clientY);
+    if (sid >= 0) tap(sid);
+  });
+
+  function tap(sid) {
+    const why = L.blockReason(lv, st, sid);
+    if (why) {
+      shake[sid] = 1;
+      $("msg").textContent = why === "covered" ? "Tiene una placa encima: quita antes sus tornillos." : "Reserva llena: ese color no tiene caja libre.";
+      Arcade.haptic("error");
+      kick(); return;
+    }
+    $("msg").textContent = "";
+    history.push(L.clone(st));
+    const s = lv.screws[sid], m = screwMesh[sid];
+    if (hintSid === sid) hintSid = -1;
+    const ev = L.apply(lv, st, sid);
+
+    // 1) el tornillo sale y viaja a su destino
+    let tg;
+    if (ev.to === "box" && dBoxes[ev.box]) { const b = dBoxes[ev.box]; tg = { box: b, k: b.items }; b.items++; }
+    else { if (ev.to === "box") desync = true; const entry = { color: s.c, mesh: m, fl: null }; dRes.push(entry); tg = { entry }; }
+    hudGroup.add(m);
+    const fl = { mesh: m, phase: 0, t: 0, dur: 0.4, y0: m.position.y, r0: m.rotation.y, from: new THREE.Vector3(), tg, fallen: ev.fallen };
+    if (tg.entry) tg.entry.fl = fl;
+    flights.push(fl);
+
+    // 2) cajas llenas salen, entran las nuevas y se absorbe la reserva
+    const keep = [];
+    dBoxes.forEach((b) => { if (b.items >= CAP) { b.wait = 0.15; leaving.push(b); } else keep.push(b); });
+    dBoxes = keep;
+    while (dBoxes.length < st.boxes.length) { const b = newBox(st.boxes[dBoxes.length].color, 0); b.enter = true; b.group.scale.setScalar(0.2); dBoxes.push(b); }
+    dBoxes.forEach((b, i) => {
+      const want = st.boxes[i] ? st.boxes[i].n : 0;
+      if (st.boxes[i] && st.boxes[i].color !== b.color) desync = true;
+      while (b.items < want) {
+        const ri = dRes.findIndex((e) => e.color === b.color);
+        if (ri < 0) { desync = true; break; }
+        const e = dRes.splice(ri, 1)[0]; sendToBox(e, b, b.items++);
+      }
+    });
+    layoutBoxes(false);
+    dBoxes.forEach((b) => { if (b.enter) b.group.position.x = b.tx; });
+
+    refreshGhosts(); updateHintRing(); updateHud(); kick();
+    if (L.won(st)) { over = true; updateHud(); finishTimer = setTimeout(() => finish(true), 1300); }
+    else if (L.lost(lv, st)) { over = true; updateHud(); $("msg").textContent = "Reserva llena y ninguna jugada posible."; finishTimer = setTimeout(() => finish(false), 1000); }
+  }
+
+  /* ---------- Herramientas ---------- */
+  function doUndo() {
+    if (over || !history.length) return;
+    st = L.clone(history.pop()); hintSid = -1; penalty++;
+    $("msg").textContent = "";
+    resetBoard(); rebuildHud(); updateHud(); draw();
+  }
+  $("undoBtn").onclick = doUndo;
+  $("restartBtn").onclick = () => startLevel(cur);
+  $("hintBtn").onclick = async () => {
+    if (over || hints <= 0 || hintSid >= 0) return;
+    const ok = await Ads.rewarded(); if (!ok) return;
+    const path = L.solve(lv, st, { cap: 400000 });
+    if (!path || !path.length) { $("msg").textContent = "Sin salida desde aquí: usa deshacer."; return; }
+    hints--; penalty++; hintSid = path[0]; updateHud(); updateHintRing(); draw();
+  };
+
+  /* ---------- Fin de nivel ---------- */
+  function finish(won) {
+    $("bUndo").style.display = won ? "none" : "";
+    if (won) {
+      const stars = penalty === 0 ? 3 : penalty <= 2 ? 2 : 1;
+      if (!progress.stars[cur] || stars > progress.stars[cur]) progress.stars[cur] = stars;
+      progress.completed = (progress.completed || 0) + 1; save();
+      Arcade.submitScore("stars", totalStars());
+      Arcade.haptic("success");
+      $("ovTitle").textContent = "¡Nivel completo!";
+      $("ovStars").textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
+      $("ovInfo").textContent = penalty ? "Ayudas usadas: " + penalty : "¡Sin ayudas!";
+      $("bNext").style.display = cur < LEVELS.length - 1 ? "" : "none";
+    } else {
+      Arcade.haptic("error");
+      $("ovTitle").textContent = "Reserva llena";
+      $("ovStars").textContent = "☆☆☆";
+      $("ovInfo").textContent = "No quedan jugadas. Deshaz o reinicia.";
+      $("bNext").style.display = "none";
+    }
+    setTimeout(async () => {
+      if (won && progress.completed % 3 === 0) await Ads.interstitial(); // anuncio cada 3 niveles
+      overlay.classList.add("on");
+    }, 150);
+  }
+  $("bUndo").onclick = () => { overlay.classList.remove("on"); over = false; doUndo(); over = false; updateHud(); };
+  $("menuBtn").onclick = () => { clearTimeout(finishTimer); buildMenu(); show("menu"); };
+  $("bMenu").onclick = () => { overlay.classList.remove("on"); buildMenu(); show("menu"); };
+  $("bRetry").onclick = () => startLevel(cur);
+  $("bNext").onclick = () => startLevel(Math.min(cur + 1, LEVELS.length - 1));
+
+  Arcade.ready().then(function (session) {
+    const s = session.state;
+    if (s && typeof s === "object" && s.stars && typeof s.stars === "object") progress = { stars: s.stars, completed: s.completed || 0 };
+    buildMenu();
+  });
+})();
+</script>
+</body>
+</html>

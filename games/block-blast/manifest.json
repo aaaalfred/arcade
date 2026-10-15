@@ -1,0 +1,23 @@
+{
+  "id": "block-blast",
+  "name": "Bloques",
+  "tagline": "Encaja las piezas y limpia filas y columnas",
+  "version": "1.0.0",
+  "sdk": 1,
+  "entry": "index.html",
+  "orientation": "portrait",
+  "theme": {
+    "accent": "#e8604c",
+    "background": "#fdfaf2",
+    "ink": "#2e473f",
+    "dark": { "accent": "#ff8a78", "background": "#14201c", "ink": "#cfe3d8" }
+  },
+  "icon": "icon.svg",
+  "progress": { "unit": "niveles", "total": 10 },
+  "boards": [
+    { "id": "classic", "name": "Mejor puntaje (Clásico)", "sort": "desc", "min": 0, "max": 500000, "integer": true, "unit": "pts" },
+    { "id": "stars", "name": "Estrellas de Niveles", "sort": "desc", "min": 0, "max": 30, "integer": true, "unit": "★" }
+  ],
+  "ads": { "interstitial": true, "rewarded": true },
+  "dev": false
+}
