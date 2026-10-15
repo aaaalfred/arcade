@@ -25,4 +25,6 @@ RUN pnpm --filter @arcade/shell build
 # ---------- runtime: nginx sirve los estáticos ----------
 FROM nginx:1.27-alpine AS runtime
 COPY --from=build /repo/apps/shell/dist /usr/share/nginx/html
+# Casita Pastel: juego estático independiente, servido en /casita/
+COPY --from=build /repo/apps/casita /usr/share/nginx/html/casita
 EXPOSE 80

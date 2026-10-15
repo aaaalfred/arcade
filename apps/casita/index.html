@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#f9d9c6">
+<meta name="description" content="Casita Pastel: una casita de muñecas digital para inventar historias.">
+<title>Casita Pastel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap">
+<link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+<div id="app">
+  <section id="inicio" class="pantalla activa" aria-label="Inicio">
+    <div id="portada"></div>
+    <div id="portada-pjs"></div>
+    <div class="inicio-contenido">
+      <h1 class="titulo">Casita <span>Pastel</span></h1>
+      <p class="subtitulo">Una casita de muñecas para inventar tus historias</p>
+      <button id="btn-jugar" class="btn-grande">Jugar</button>
+      <p id="aviso-guardado" class="aviso-guardado" hidden>Tu casita te espera tal como la dejaste</p>
+    </div>
+  </section>
+
+  <section id="juego" class="pantalla" aria-label="Casita">
+    <div id="area">
+      <div id="escenario"></div>
+      <button id="flecha-izq" class="flecha izq" aria-label="Ir a la habitación de la izquierda"><span class="flecha-ico"></span><span class="flecha-txt"></span></button>
+      <button id="flecha-der" class="flecha der" aria-label="Ir a la habitación de la derecha"><span class="flecha-ico"></span><span class="flecha-txt"></span></button>
+      <div id="barra-sup">
+        <button id="btn-casa" class="btn-icono" aria-label="Volver al inicio" title="Inicio"></button>
+        <div id="nombre-cuarto" class="pastilla"></div>
+        <div class="grupo">
+          <button id="btn-editar" class="btn-icono" aria-label="Vestidor" title="Vestidor"></button>
+          <button id="btn-sonido" class="btn-icono" aria-label="Sonido" title="Sonido"></button>
+          <button id="btn-reiniciar" class="btn-icono" aria-label="Reiniciar partida" title="Reiniciar"></button>
+        </div>
+      </div>
+      <div id="panel-pj" hidden>
+        <div class="panel-retrato"></div>
+        <div class="panel-nombre"></div>
+        <div class="panel-caras">
+          <button class="cara" data-expr="feliz" aria-label="Alegría" title="Alegría"></button>
+          <button class="cara" data-expr="triste" aria-label="Tristeza" title="Tristeza"></button>
+          <button class="cara" data-expr="sorpresa" aria-label="Sorpresa" title="Sorpresa"></button>
+          <button class="cara" data-expr="enojo" aria-label="Enojo" title="Enojo"></button>
+        </div>
+        <button class="panel-editar" aria-label="Cambiar ropa" title="Cambiar ropa"></button>
+      </div>
+      <div id="ayuda" class="ayuda" hidden></div>
+    </div>
+    <div id="bandeja">
+      <div class="bandeja-tablero">
+        <div class="bandeja-titulo"><span class="bandeja-ico"></span>Bandeja</div>
+        <div class="ranuras"></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="arrastre"></div>
+  <div id="modal-editor" class="modal" hidden></div>
+  <div id="modal-confirmar" class="modal" hidden>
+    <div class="modal-caja confirmar">
+      <h2>¿Reiniciar la partida?</h2>
+      <p>La casita volverá a como estaba al principio y se borrará lo que cambiaste.</p>
+      <div class="botones">
+        <button class="btn-grande secundario" data-accion="cancelar">Cancelar</button>
+        <button class="btn-grande peligro" data-accion="reiniciar">Sí, reiniciar</button>
+      </div>
+    </div>
+  </div>
+  <div id="aviso-girar" class="modal" hidden>
+    <div class="modal-caja confirmar">
+      <div class="girar-ico"></div>
+      <h2>Gira tu dispositivo</h2>
+      <p>La casita se ve mejor en horizontal.</p>
+      <div class="botones"><button class="btn-grande secundario" data-accion="seguir">Seguir así</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/arte/personaje.js"></script>
+<script src="js/arte/objetos.js"></script>
+<script src="js/arte/muebles.js"></script>
+<script src="js/arte/iconos.js"></script>
+<script src="js/datos.js"></script>
+<script src="js/sonido.js"></script>
+<script src="js/guardado.js"></script>
+<script src="js/juego.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
